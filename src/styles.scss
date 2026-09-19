@@ -1,1 +1,300 @@
-/* You can add global styles to this file, and also import other style files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Morgan Treasure - Imperial Midnight & Champagne Gold Web3 Design System */
+/* Designed for both Desktop Web3 Explorers & Mobile Wallet In-App Browsers */
+
+:root {
+  --bg-primary: #05070f;
+  --bg-surface: #0a0e1c;
+  --bg-card: rgba(13, 19, 36, 0.88);
+  --bg-card-hover: rgba(18, 26, 48, 0.95);
+  --bg-input: #070a14;
+
+  --gold-primary: #f5ba31;
+  --gold-light: #fde68a;
+  --gold-dark: #b45309;
+  --gold-gradient: linear-gradient(135deg, #fff7db 0%, #f5ba31 45%, #d97706 85%, #92400e 100%);
+  --gold-glow: 0 0 28px rgba(245, 186, 49, 0.32);
+
+  --emerald-primary: #10b981;
+  --emerald-light: #6ee7b7;
+  --emerald-dark: #047857;
+  --emerald-gradient: linear-gradient(135deg, #d1fae5 0%, #10b981 45%, #059669 85%, #065f46 100%);
+  --emerald-glow: 0 0 24px rgba(16, 185, 129, 0.28);
+
+  --cyan-primary: #06b6d4;
+  --cyan-light: #67e8f9;
+  --cyan-gradient: linear-gradient(135deg, #cffafe 0%, #06b6d4 50%, #0284c7 100%);
+
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-gold: rgba(245, 186, 49, 0.35);
+  --border-emerald: rgba(16, 185, 129, 0.35);
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --text-gold: #fde68a;
+  --text-emerald: #6ee7b7;
+
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  letter-spacing: -0.015em;
+}
+
+body {
+  background-image: 
+    radial-gradient(circle at 15% 10%, rgba(245, 186, 49, 0.09) 0%, transparent 45%),
+    radial-gradient(circle at 85% 25%, rgba(6, 182, 212, 0.07) 0%, transparent 50%),
+    radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 55%),
+    linear-gradient(180deg, #05070f 0%, #030409 100%);
+  background-attachment: fixed;
+}
+
+/* Fluid responsive container */
+.dapp-container {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Tabular figures for financial numbers */
+.font-numbers, .tabular-nums {
+  font-family: var(--font-ui);
+  font-feature-settings: 'tnum' on, 'lnum' on, 'zero' on;
+  letter-spacing: -0.02em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+/* Gradients text */
+.gradient-text-gold {
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-emerald {
+  background: var(--emerald-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-cyan {
+  background: var(--cyan-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Imperial Glass Cards with Generous Spacing */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glass);
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-gold {
+  background: linear-gradient(180deg, rgba(22, 29, 48, 0.94) 0%, rgba(13, 19, 36, 0.97) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-gold);
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 30px rgba(245, 186, 49, 0.12);
+  position: relative;
+}
+
+.glass-panel-emerald {
+  background: linear-gradient(180deg, rgba(16, 32, 40, 0.94) 0%, rgba(11, 22, 28, 0.97) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-emerald);
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 30px rgba(16, 185, 129, 0.12);
+  position: relative;
+}
+
+/* Backwards compatibility for boxed-panel */
+.boxed-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--border-glass);
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Web3 Buttons */
+.btn-gold-glow {
+  background: var(--gold-gradient);
+  color: #080b12;
+  font-weight: 800;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 22px;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(245, 186, 49, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(245, 186, 49, 0.5);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+}
+
+.btn-emerald-glow {
+  background: var(--emerald-gradient);
+  color: #02120b;
+  font-weight: 800;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 22px;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+  }
+}
+
+.btn-glass {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+}
+
+/* Custom Interactive Range Slider */
+input[type=range].dapp-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #111827;
+  outline: none;
+  transition: background 0.2s;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FFF7DB 0%, #F5BA31 50%, #D97706 100%);
+    border: 3px solid #06080F;
+    box-shadow: 0 0 14px rgba(245, 186, 49, 0.7);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+
+  &::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
+
+  &::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FFF7DB 0%, #F5BA31 50%, #D97706 100%);
+    border: 3px solid #06080F;
+    box-shadow: 0 0 14px rgba(245, 186, 49, 0.7);
+    cursor: pointer;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+/* Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #05070f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
