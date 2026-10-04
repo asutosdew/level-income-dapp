@@ -23,9 +23,12 @@ export interface ApiResponse<T = unknown> {
   providedIn: 'root'
 })
 export class PhpApiService {
-  // Base URL for the PHP Backend API (Configurable)
-  // By default, points to local PHP dev server (e.g. http://localhost:8000/backend-php or /backend-php)
-  public apiBaseUrl = signal<string>('http://localhost:8000');
+  // Base URL for the PHP Backend API (Auto-detects /api on production cPanel vs http://localhost:8000 on localhost)
+  public apiBaseUrl = signal<string>(
+    typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' 
+      ? '/api' 
+      : 'http://localhost:8000'
+  );
   public isConnectedToPhp = signal<boolean>(false);
   public lastSyncTime = signal<string>('Offline Mode (Simulated)');
 
