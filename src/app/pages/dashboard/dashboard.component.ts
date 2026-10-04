@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -549,7 +549,7 @@ import { SoundService } from '../../services/sound.service';
     }
   `]
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   public simulatedAmount = 1000;
 
   constructor(
@@ -558,6 +558,10 @@ export class DashboardComponent {
     private notificationService: NotificationService,
     private soundService: SoundService
   ) {}
+
+  ngOnInit(): void {
+    this.dappState.syncWithBackend();
+  }
 
   setSimulatedAmount(amt: number): void {
     this.soundService.playTap();

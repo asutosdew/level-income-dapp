@@ -16,6 +16,7 @@ import {
 import { NotificationService } from './notification.service';
 import { SoundService } from './sound.service';
 import { Web3Service } from './web3.service';
+import { PhpApiService } from './php-api.service';
 
 const STORAGE_KEY = 'morgantreasure_dapp_v1';
 const INR_CONVERSION_RATE = 90; // 1 USDT = 90 INR
@@ -268,15 +269,60 @@ export class DappStateService {
   constructor(
     private notificationService: NotificationService,
     private soundService: SoundService,
-    private web3Service: Web3Service
+    private web3Service: Web3Service,
+    private phpApi: PhpApiService
   ) {
     this.loadState();
     this.startCountdownTimer();
     this.startLiquiditySimulation();
 
+    // Sync with MariaDB on account change
+    effect(() => {
+      const account = this.web3Service.currentAccount();
+      if (account) {
+        this.syncWithBackend(account);
+      }
+    });
+
     // Auto-save on state change
     effect(() => {
       this.saveState();
+    });
+  }
+
+  // Synchronize state with MariaDB PHP Backend
+  public syncWithBackend(targetAddress?: string): void {
+    const address = (targetAddress || this.web3Service.currentAccount() || this.user().address).toLowerCase();
+    if (!address) return;
+
+    this.phpApi.getUserProfile(address).subscribe(profile => {
+      if (profile) {
+        this.user.set(profile);
+      }
+    });
+
+    this.phpApi.getTransactions(address).subscribe(txs => {
+      if (txs && txs.length > 0) {
+        this.transactions.set(txs);
+      }
+    });
+
+    this.phpApi.getTeam(address).subscribe(team => {
+      if (team && team.directs && team.directs.length > 0) {
+        this.directs.set(team.directs);
+      }
+    });
+
+    this.phpApi.getLevelIncome(address).subscribe(tiers => {
+      if (tiers && tiers.length > 0) {
+        this.levelTiers.set(tiers);
+      }
+    });
+
+    this.phpApi.getLiquidityStats().subscribe(stats => {
+      if (stats) {
+        this.liquidityPool.set(stats);
+      }
     });
   }
 
@@ -506,6 +552,15 @@ export class DappStateService {
     };
 
     this.transactions.update(txs => [newTx, ...txs]);
+
+    // Record in MariaDB via PHP API
+    this.phpApi.claimDailyRoi({
+      wallet_address: this.web3Service.currentAccount() || currentUser.address
+    }).subscribe({
+      next: () => this.syncWithBackend(),
+      error: () => {}
+    });
+
     this.soundService.playReward();
     this.notificationService.success('ROI Claimed!', `+$${dailyReward.toFixed(2)} USDT added to available balance.`);
   }
@@ -544,6 +599,17 @@ export class DappStateService {
     };
 
     this.transactions.update(txs => [newTx, ...txs]);
+
+    // Record in MariaDB via PHP API
+    this.phpApi.recordWithdrawal({
+      wallet_address: receivingAddress || currentUser.address,
+      amount_usdt: amountUsdt,
+      tx_hash: txHash
+    }).subscribe({
+      next: () => this.syncWithBackend(),
+      error: () => {}
+    });
+
     this.soundService.playSuccess();
     this.notificationService.success('Withdrawal Processed', `Sent $${net.toFixed(2)} USDT (BEP-20) to your wallet.`);
     return { success: true, txHash };

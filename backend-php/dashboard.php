@@ -1,17 +1,22 @@
 <?php
+/**
+ * Morgan Treasure - User Dashboard Profile API
+ * Computes live balances, rank, capping limit, team turnover, strong leg/other legs volume from MariaDB.
+ */
+
 require_once __DIR__ . '/config.php';
 
-$address = trim($_GET['address'] ?? '');
+$address = strtolower(trim($_GET['address'] ?? ''));
 
-if (empty($address) || !preg_match('/^0x[a-fA-F0-9]{40}$/', $address)) {
+if (empty($address) || !preg_match('/^0x[a-f0-9]{40}$/', $address)) {
     sendResponse('error', 'Valid BNB Chain (BEP-20) address parameter required', null, 422);
 }
 
 $pdo = getDbConnection();
 
+// Fallback simulated response if DB connection is unavailable
 if (!$pdo) {
-    // Fallback simulated response
-    sendResponse('success', 'User profile retrieved (Simulated)', [
+    sendResponse('success', 'User profile retrieved (Simulated Demo)', [
         'address' => $address,
         'userId' => 'MT-77291',
         'sponsorId' => 'MT-10024',
@@ -45,24 +50,59 @@ try {
     $user = $stmt->fetch();
 
     if (!$user) {
-        // Auto register if not existing
+        // Auto register if user visits for first time
         $userId = 'MT-' . rand(10000, 99999);
-        $insert = $pdo->prepare("INSERT INTO users (wallet_address, user_id, sponsor_id) VALUES (?, ?, 'MT-10024')");
-        $insert->execute([$address, $userId]);
-        
+        $insert = $pdo->prepare("
+            INSERT INTO users (wallet_address, user_id, sponsor_id, sponsor_address, nickname, rank, is_registered) 
+            VALUES (?, ?, 'MT-10024', '0x9b32fa99834190cbbde029104fa2841b994801ac', ?, 'Treasure Explorer', 1)
+        ");
+        $nickname = 'Investor ' . substr($address, 2, 4);
+        $insert->execute([$address, $userId, $nickname]);
+
         $stmt->execute([$address]);
         $user = $stmt->fetch();
     }
 
-    sendResponse('success', 'User profile loaded', [
+    // Calculate Leg Volumes (Strong Leg vs Other Legs)
+    $legStmt = $pdo->prepare("
+        SELECT id, wallet_address, (total_staked_usdt + total_team_turnover_usdt) as leg_volume 
+        FROM users 
+        WHERE sponsor_address = ? 
+        ORDER BY leg_volume DESC
+    ");
+    $legStmt->execute([$address]);
+    $legs = $legStmt->fetchAll();
+
+    $strongLeg = 0.0;
+    $otherLegs = 0.0;
+    $totalTurnover = (float)$user['total_team_turnover_usdt'];
+
+    if (!empty($legs)) {
+        $strongLeg = (float)$legs[0]['leg_volume'];
+        for ($i = 1; $i < count($legs); $i++) {
+            $otherLegs += (float)$legs[$i]['leg_volume'];
+        }
+    } else {
+        $strongLeg = round($totalTurnover * 0.6, 2);
+        $otherLegs = round($totalTurnover * 0.4, 2);
+    }
+
+    $totalStaked = (float)$user['total_staked_usdt'];
+    $maxCap = (float)$user['max_capping_limit_usdt'];
+    if ($maxCap <= 0 && $totalStaked > 0) {
+        $maxCap = $totalStaked * MAX_CAPPING_MULTIPLIER;
+    }
+
+    sendResponse('success', 'User profile loaded successfully from MariaDB', [
         'address' => $user['wallet_address'],
         'userId' => $user['user_id'],
         'sponsorId' => $user['sponsor_id'],
         'sponsorAddress' => $user['sponsor_address'] ?? '0x9b32fa99834190cbbde029104fa2841b994801ac',
         'referralCode' => str_replace('-', '', $user['user_id']),
+        'nickname' => $user['nickname'],
         'activePackageId' => $user['active_package_id'],
         'activePackageName' => $user['active_package_name'],
-        'totalStakedUsdt' => (float)$user['total_staked_usdt'],
+        'totalStakedUsdt' => $totalStaked,
         'availableBalanceUsdt' => (float)$user['available_balance_usdt'],
         'totalWithdrawnUsdt' => (float)$user['total_withdrawn_usdt'],
         'totalLevelIncomeUsdt' => (float)$user['total_level_income_usdt'],
@@ -73,14 +113,15 @@ try {
         'directsCount' => (int)$user['directs_count'],
         'activeDirectsCount' => (int)$user['active_directs_count'],
         'totalTeamCount' => (int)$user['total_team_count'],
-        'totalTeamTurnoverUsdt' => (float)$user['total_team_turnover_usdt'],
-        'strongLegVolumeUsdt' => (float)$user['total_team_turnover_usdt'] * 0.6,
-        'otherLegsVolumeUsdt' => (float)$user['total_team_turnover_usdt'] * 0.4,
-        'maxCappingLimitUsdt' => (float)$user['max_capping_limit_usdt'],
+        'totalTeamTurnoverUsdt' => $totalTurnover,
+        'strongLegVolumeUsdt' => round($strongLeg, 2),
+        'otherLegsVolumeUsdt' => round($otherLegs, 2),
+        'maxCappingLimitUsdt' => $maxCap,
         'totalEarningTowardsCapUsdt' => (float)$user['total_earning_towards_cap_usdt'],
-        'isRegistered' => true
+        'isRegistered' => (bool)$user['is_registered'],
+        'isActive' => (bool)$user['is_active']
     ]);
 
 } catch (Exception $e) {
-    sendResponse('error', 'Query error: ' . $e->getMessage(), null, 500);
+    sendResponse('error', 'Dashboard query error: ' . $e->getMessage(), null, 500);
 }

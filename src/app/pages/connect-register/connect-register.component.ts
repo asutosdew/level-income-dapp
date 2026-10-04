@@ -267,6 +267,7 @@ export class ConnectRegisterComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.dappState.registerUser(this.sponsorId, this.nickname);
+        this.dappState.syncWithBackend();
         this.isSubmitting.set(false);
         this.notificationService.success('Registration Complete', 'Welcome to Morgan Treasure!');
         this.router.navigate(['/dashboard']);

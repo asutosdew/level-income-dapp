@@ -2,13 +2,21 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { LiquidityPoolStats, UserProfile, LevelIncomeTier, DirectReferral } from '../models/dapp.models';
+import { 
+  LiquidityPoolStats, 
+  UserProfile, 
+  LevelIncomeTier, 
+  DirectReferral, 
+  TransactionRecord, 
+  RoyaltyClub 
+} from '../models/dapp.models';
 import { NotificationService } from './notification.service';
 
 export interface ApiResponse<T = unknown> {
   status: 'success' | 'error';
   message: string;
   data?: T;
+  timestamp?: string;
 }
 
 @Injectable({
@@ -16,8 +24,8 @@ export interface ApiResponse<T = unknown> {
 })
 export class PhpApiService {
   // Base URL for the PHP Backend API (Configurable)
-  // By default, points to local PHP dev server or relative /api path
-  public apiBaseUrl = signal<string>('http://localhost:8000/api');
+  // By default, points to local PHP dev server (e.g. http://localhost:8000/backend-php or /backend-php)
+  public apiBaseUrl = signal<string>('http://localhost:8000');
   public isConnectedToPhp = signal<boolean>(false);
   public lastSyncTime = signal<string>('Offline Mode (Simulated)');
 
@@ -41,7 +49,7 @@ export class PhpApiService {
       .pipe(
         catchError(() => {
           this.isConnectedToPhp.set(false);
-          this.lastSyncTime.set('Standalone Mode (Built-in Demo Engine)');
+          this.lastSyncTime.set('Standalone Hybrid Mode (Demo Engine Active)');
           return of(null);
         })
       )
@@ -49,12 +57,12 @@ export class PhpApiService {
         if (res && res.status === 'success') {
           this.isConnectedToPhp.set(true);
           this.lastSyncTime.set(new Date().toLocaleTimeString());
-          this.notificationService.success('PHP API Connected', 'Synchronized with Morgan Treasure Backend.');
+          this.notificationService.success('MariaDB Backend Connected', 'Synchronized with Morgan Treasure Hybrid Backend.');
         }
       });
   }
 
-  // Update API URL (e.g. from user settings or admin panel)
+  // Update API URL
   setApiBaseUrl(url: string): void {
     this.apiBaseUrl.set(url.replace(/\/$/, ''));
     this.testConnection();
@@ -72,26 +80,28 @@ export class PhpApiService {
       );
   }
 
-  // 2. Register Account with Sponsor ID
+  // 2. Register Account with Sponsor ID in MariaDB
   register(payload: { wallet_address: string; sponsor_id: string; nickname?: string }): Observable<ApiResponse> {
     return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/register.php`, payload, this.httpOptions)
       .pipe(
         catchError(err => {
           console.warn('PHP API /register.php offline, falling back to local registration:', err);
+          const simulatedUserId = 'MT-' + Math.floor(10000 + Math.random() * 90000);
           return of({
             status: 'success',
             message: 'Registered in local session (PHP backend offline)',
             data: {
-              userId: 'MT-' + Math.floor(10000 + Math.random() * 90000),
+              userId: simulatedUserId,
               sponsorId: payload.sponsor_id || 'MT-10024',
-              wallet_address: payload.wallet_address
+              wallet_address: payload.wallet_address,
+              referralCode: simulatedUserId.replace('-', '')
             }
           } as ApiResponse);
         })
       );
   }
 
-  // 3. Get User Dashboard Profile
+  // 3. Get User Dashboard Profile from MariaDB
   getUserProfile(walletAddress: string): Observable<UserProfile | null> {
     return this.http.get<ApiResponse<UserProfile>>(`${this.apiBaseUrl()}/dashboard.php?address=${walletAddress}`)
       .pipe(
@@ -103,7 +113,7 @@ export class PhpApiService {
       );
   }
 
-  // 4. Record BEP-20 USDT Staking Deposit
+  // 4. Record BEP-20 USDT Staking Deposit in MariaDB
   recordDeposit(payload: {
     wallet_address: string;
     amount_usdt: number;
@@ -123,7 +133,7 @@ export class PhpApiService {
       );
   }
 
-  // 5. Fetch Level Income Breakdown (Levels 1 to 15)
+  // 5. Fetch Level Income Breakdown (Levels 1 to 15) from MariaDB
   getLevelIncome(walletAddress: string): Observable<LevelIncomeTier[] | null> {
     return this.http.get<ApiResponse<LevelIncomeTier[]>>(`${this.apiBaseUrl()}/level_income.php?address=${walletAddress}`)
       .pipe(
@@ -135,7 +145,7 @@ export class PhpApiService {
       );
   }
 
-  // 6. Fetch Team Downline & Direct Referrals
+  // 6. Fetch Team Downline & Direct Referrals from MariaDB
   getTeam(walletAddress: string): Observable<{ directs: DirectReferral[]; totalCount: number; turnover: number } | null> {
     return this.http.get<ApiResponse<{ directs: DirectReferral[]; totalCount: number; turnover: number }>>(
       `${this.apiBaseUrl()}/team.php?address=${walletAddress}`
@@ -148,7 +158,7 @@ export class PhpApiService {
     );
   }
 
-  // 7. Record MTG Token Purchase
+  // 7. Record MTG Token Purchase in MariaDB
   recordTokenPurchase(payload: {
     wallet_address: string;
     tokens_amount: number;
@@ -165,6 +175,75 @@ export class PhpApiService {
             message: 'Token purchase recorded locally',
             data: payload
           } as ApiResponse);
+        })
+      );
+  }
+
+  // 8. Fetch Unified Master Transactions Ledger from MariaDB
+  getTransactions(walletAddress: string, type = 'all'): Observable<TransactionRecord[] | null> {
+    return this.http.get<ApiResponse<TransactionRecord[]>>(`${this.apiBaseUrl()}/transactions.php?address=${walletAddress}&type=${type}`)
+      .pipe(
+        map(res => res.data || null),
+        catchError(err => {
+          console.warn('PHP API /transactions.php offline, using local transactions:', err);
+          return of(null);
+        })
+      );
+  }
+
+  // 9. Process Withdrawal via MariaDB API
+  recordWithdrawal(payload: {
+    wallet_address: string;
+    amount_usdt: number;
+    tx_hash?: string;
+  }): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/withdraw.php`, payload, this.httpOptions)
+      .pipe(
+        catchError(err => {
+          console.warn('PHP API /withdraw.php offline, withdrawal recorded locally:', err);
+          return of({
+            status: 'success',
+            message: 'Withdrawal recorded locally (PHP offline)',
+            data: payload
+          } as ApiResponse);
+        })
+      );
+  }
+
+  // 10. Claim Daily Dynamic Staking ROI in MariaDB
+  claimDailyRoi(payload: { wallet_address: string }): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/claim_roi.php`, payload, this.httpOptions)
+      .pipe(
+        catchError(err => {
+          console.warn('PHP API /claim_roi.php offline, ROI claimed locally:', err);
+          return of({
+            status: 'success',
+            message: 'ROI claimed locally (PHP offline)',
+            data: payload
+          } as ApiResponse);
+        })
+      );
+  }
+
+  // 11. Fetch Royalty Clubs Qualifications from MariaDB
+  getRoyaltyStatus(walletAddress: string): Observable<RoyaltyClub[] | null> {
+    return this.http.get<ApiResponse<RoyaltyClub[]>>(`${this.apiBaseUrl()}/royalty.php?address=${walletAddress}`)
+      .pipe(
+        map(res => res.data || null),
+        catchError(err => {
+          console.warn('PHP API /royalty.php offline, using local royalty rules:', err);
+          return of(null);
+        })
+      );
+  }
+
+  // 12. Fetch Admin Analytics & Auditing from MariaDB
+  getAdminStats(): Observable<ApiResponse | null> {
+    return this.http.get<ApiResponse>(`${this.apiBaseUrl()}/admin.php`)
+      .pipe(
+        catchError(err => {
+          console.warn('PHP API /admin.php offline:', err);
+          return of(null);
         })
       );
   }

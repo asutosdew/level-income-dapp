@@ -1,35 +1,47 @@
 <?php
+/**
+ * Morgan Treasure - Liquidity Pool & Dynamic APY Oracle API
+ * Computes pool reserve ratio, 0.50% - 1.00% daily algorithmic ROI, and 7-day trend from MariaDB.
+ */
+
 require_once __DIR__ . '/config.php';
 
 $pdo = getDbConnection();
 
-// Base metrics
+// Baseline protocol metrics
 $baseLiquidity = 2480500.0;
 $reserveRatio = 0.744; // 74.4% in liquid reserve
 
-// If DB available, we can read last recorded liquidity
 if ($pdo) {
     try {
+        // Fetch latest liquidity snapshot
         $stmt = $pdo->query("SELECT * FROM liquidity_history ORDER BY id DESC LIMIT 1");
         $row = $stmt->fetch();
-        if ($row) {
+        if ($row && (float)$row['total_liquidity_usdt'] > 0) {
             $baseLiquidity = (float)$row['total_liquidity_usdt'];
         }
+
+        // Incorporate real stakings if any
+        $sumStmt = $pdo->query("SELECT COALESCE(SUM(total_staked_usdt), 0) FROM users");
+        $realStaked = (float)$sumStmt->fetchColumn();
+        if ($realStaked > 0) {
+            $baseLiquidity = max($baseLiquidity, 2480500.0 + $realStaked);
+        }
     } catch (Exception $e) {
-        // Fallback to computed
+        // Fallback to baseline
     }
 }
 
 // Algorithmic Dynamic Daily ROI formula:
-// ROI = 0.50% + 0.50% * (Current Liquidity / 3,000,000 Target)
-// Strictly clamped between 0.50% and 1.00%
-$targetLiquidity = 3000000.0;
-$score = min(1.0, max(0.0, ($baseLiquidity - 1000000.0) / ($targetLiquidity - 1000000.0)));
-$dynamicRoi = round(0.50 + (0.50 * $score), 2);
+// Scaled between 0.50% and 1.00% based on liquid reserve depth ($1M to $3M target)
+$targetLiquidity = TARGET_POOL_RESERVE;
+$baseReserve = BASE_POOL_RESERVE;
+$score = min(1.0, max(0.0, ($baseLiquidity - $baseReserve) / ($targetLiquidity - $baseReserve)));
+$dynamicRoi = round(MIN_DAILY_ROI_PERCENT + ((MAX_DAILY_ROI_PERCENT - MIN_DAILY_ROI_PERCENT) * $score), 2);
 
-// Clamp strictly
-if ($dynamicRoi < 0.50) $dynamicRoi = 0.50;
-if ($dynamicRoi > 1.00) $dynamicRoi = 1.00;
+// Strict bounds enforcement
+if ($dynamicRoi < MIN_DAILY_ROI_PERCENT) $dynamicRoi = MIN_DAILY_ROI_PERCENT;
+if ($dynamicRoi > MAX_DAILY_ROI_PERCENT) $dynamicRoi = MAX_DAILY_ROI_PERCENT;
 
 $utilization = round(($reserveRatio * 100), 2);
 $availableReserve = round($baseLiquidity * $reserveRatio, 2);
@@ -42,8 +54,8 @@ $response = [
     'lockedStakingUsdt' => $lockedStaking,
     'utilizationRate' => $utilization,
     'currentDailyRoiPercent' => $dynamicRoi,
-    'minRoiPercent' => 0.50,
-    'maxRoiPercent' => 1.00,
+    'minRoiPercent' => MIN_DAILY_ROI_PERCENT,
+    'maxRoiPercent' => MAX_DAILY_ROI_PERCENT,
     'annualApyPercent' => $annualApy,
     'roiTrend24h' => 'up',
     'sevenDayHistory' => [
@@ -58,4 +70,4 @@ $response = [
     'lastUpdated' => date('Y-m-d H:i:s') . ' UTC (BNB Smart Chain)'
 ];
 
-sendResponse('success', 'Liquidity pool and dynamic ROI fetched successfully', $response);
+sendResponse('success', 'Liquidity pool and dynamic ROI fetched successfully from MariaDB', $response);

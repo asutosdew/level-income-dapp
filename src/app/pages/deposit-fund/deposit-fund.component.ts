@@ -450,7 +450,10 @@ export class DepositFundComponent {
         amount_usdt: this.selectedAmount,
         package_id: 'custom_' + this.selectedAmount,
         tx_hash: contractRes.txHash
-      }).subscribe();
+      }).subscribe({
+        next: () => this.dappState.syncWithBackend(),
+        error: () => {}
+      });
 
       this.dappState.depositUsdt(this.selectedAmount, this.selectedPackageName);
       this.isDepositing.set(false);
@@ -472,7 +475,10 @@ export class DepositFundComponent {
         paid_amount: this.payAmount,
         paid_currency: this.payMethod,
         tx_hash: swapRes.txHash
-      }).subscribe();
+      }).subscribe({
+        next: () => this.dappState.syncWithBackend(),
+        error: () => {}
+      });
 
       this.dappState.buyMtgTokens(this.payAmount, this.payMethod);
       this.isBuyingTokens.set(false);

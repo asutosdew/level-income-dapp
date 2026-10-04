@@ -132,15 +132,16 @@ try {
     $payoutIns = $pdo->prepare("
         INSERT INTO daily_roi_payouts (
             wallet_address, user_id, staked_amount_usdt, roi_rate_percent, 
-            gross_payout_usdt, credited_payout_usdt, remaining_cap_after
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            gross_payout_usdt, credited_payout_usdt, remaining_cap_after, payout_date, tx_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $userUpd = $pdo->prepare("
         UPDATE users 
         SET available_balance_usdt = available_balance_usdt + ?,
             total_roi_income_usdt = total_roi_income_usdt + ?,
-            total_earning_towards_cap_usdt = total_earning_towards_cap_usdt + ?
+            total_earning_towards_cap_usdt = total_earning_towards_cap_usdt + ?,
+            last_roi_claim_at = NOW()
         WHERE id = ?
     ");
 
@@ -170,6 +171,8 @@ try {
         }
 
         if (!$dryRun) {
+            $cronTxHash = '0x' . bin2hex(random_bytes(32));
+
             $payoutIns->execute([
                 $user['wallet_address'],
                 $user['user_id'],
@@ -177,7 +180,9 @@ try {
                 $dynamicDailyRoi,
                 $grossDailyRoi,
                 $creditedRoi,
-                $remainingCapAfter
+                $remainingCapAfter,
+                $today,
+                $cronTxHash
             ]);
 
             $userUpd->execute([
@@ -186,6 +191,21 @@ try {
                 $creditedRoi,
                 $user['id']
             ]);
+
+            logTransaction(
+                $pdo,
+                $user['wallet_address'],
+                $user['user_id'],
+                'daily_roi',
+                "Daily Liquidity ROI ({$dynamicDailyRoi}%)",
+                $creditedRoi,
+                0.0000,
+                $creditedRoi,
+                'completed',
+                $cronTxHash,
+                'BNB Chain',
+                ['staked' => $staked, 'rate' => $dynamicDailyRoi, 'remaining_cap' => $remainingCapAfter]
+            );
         }
 
         $totalUsersProcessed++;

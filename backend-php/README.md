@@ -1,36 +1,82 @@
-# Morgan Treasure - PHP Backend API Suite
+# Morgan Treasure - Hybrid Web3 Architecture & MariaDB PHP API Suite
 
-This directory contains the complete PHP REST API backend for **Morgan Treasure**, designed to run on Apache, Nginx, XAMPP, or cPanel.
-
-## Endpoints Included
-
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `GET /liquidity.php` | GET | Real-time liquidity pool status & dynamic 0.5%–1.0% daily ROI rate |
-| `POST /register.php` | POST | Register BEP-20 wallet address with Sponsor ID/referral binding |
-| `GET /dashboard.php?address=0x...` | GET | User portfolio, active packages, available balances, and capping limit |
-| `POST /deposit.php` | POST | Record on-chain USDT deposit and distribute 15-level commissions |
-| `GET /level_income.php?address=0x...` | GET | 15-tier level income analytics and unlock tracking |
-| `GET /team.php?address=0x...` | GET | Direct referrals and downline network metrics |
+This directory contains the production-ready **PHP REST API & MariaDB Backend** for the **Morgan Treasure** Hybrid Web3 Investment Platform.
 
 ---
 
-## Quick Start (Local Development)
+## 🏛️ Hybrid Model Architecture Overview
 
-### 1. Start the PHP Built-in Server
-Open your terminal in this directory:
+In this Hybrid model:
+1. **Blockchain Layer (BNB Smart Chain / BSC)**:
+   - MTG Token (BEP-20) and USDT contracts live on BSC.
+   - Users connect via MetaMask, TrustWallet, or Binance Web3.
+   - Wallet addresses serve as immutable cryptographic user IDs.
+   - Token balances and transaction hashes are verifiable on BscScan.
+2. **Database & API Layer (MariaDB / MySQL + PHP 8.x)**:
+   - **All Team & Genealogy**: Multi-level sponsor tree, downline generations (Levels 1 to 15), direct referrals.
+   - **All Investments**: Staking packages ($50 Starter to $5,000 Imperial Treasure or custom), daily ROI rate at deposit, transaction hashes.
+   - **All Returns & Earnings**:
+     - Dynamic Daily ROI (0.50% to 1.00% daily, floating with liquidity reserve depth).
+     - 15-Tier MLM Level Income (10%, 5%, 3%, 2%, 1%, 0.5% × 5, 0.25% × 5).
+     - Direct Referral Bonus (10%).
+     - Strict 300% (3.0x) Max Profit Capping Enforcement.
+     - 4 Royalty Leadership Clubs (Treasure Star, Morgan Ruby, Morgan Emerald, Crown Diamond).
+   - **All Transactions**: Master audit ledger (`transactions` table) tracking deposits, withdrawals, daily ROI payouts, level commissions, and token purchases.
+   - **Withdrawals**: Deducts 5% liquidity retention fee (2.5% admin + 2.5% royalty pool) and processes net payouts.
+
+---
+
+## 📋 Complete API Endpoints Suite
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `GET /liquidity.php` | GET | Real-time liquidity pool reserve, 0.50%–1.00% dynamic daily ROI rate, and 7-day history |
+| `POST /register.php` | POST | Register BEP-20 wallet address with Sponsor ID binding and genealogy hierarchy |
+| `GET /dashboard.php?address=0x...` | GET | User portfolio, balances, 300% capping status, strong leg vs other legs volume |
+| `POST /deposit.php` | POST | Record BEP-20 USDT deposit, update 300% capping limit, distribute 15-tier MLM commissions |
+| `GET /level_income.php?address=0x...` | GET | 15-generation downline counts, active stakers, turnovers, and unlock criteria |
+| `GET /team.php?address=0x...` | GET | Direct referrals (Level 1) with active package, stake, commission, and joined date |
+| `GET /transactions.php?address=0x...` | GET | Unified master ledger history (Deposits, Withdrawals, ROI, Commissions, Token Buys) |
+| `POST /withdraw.php` | POST | Process USDT withdrawal with 5% liquidity retention fee and balance deduction |
+| `POST /token_order.php` | POST | Record MTG Token Presale Swap (paid via BNB or USDT) and update metrics |
+| `POST /claim_roi.php` | POST | On-demand dynamic daily staking ROI claim with 300% capping enforcement |
+| `GET /royalty.php?address=0x...` | GET | Evaluate user qualification for 4 Royalty Leadership Clubs and rewards |
+| `GET /admin.php` | GET | Platform-wide metrics, total stakers, vault reserve health, and audit trail |
+| `GET /cron_daily_roi.php` | GET/CLI | Automated midnight dynamic APY/ROI engine with idempotency protection |
+
+---
+
+## 🗄️ Database Setup (MariaDB / MySQL)
+
+### 1. Create Database and Import Schema
+Run the following in your MariaDB / MySQL terminal or via phpMyAdmin:
 ```bash
-cd backend-php
-php -S localhost:8000
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS morgan_treasure DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p morgan_treasure < schema.sql
 ```
 
-### 2. Optional: Setup MySQL Database
-1. Create a MySQL database named `morgan_treasure`.
-2. Import the `schema.sql` file via phpMyAdmin or command line:
-   ```bash
-   mysql -u root -p morgan_treasure < schema.sql
-   ```
-3. Update `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` in `config.php` if needed.
+### 2. Configure Credentials
+Edit `config.php` or set environment variables:
+```php
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
+define('DB_NAME', getenv('DB_NAME') ?: 'morgan_treasure');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+```
 
-> [!NOTE]
-> Even if MySQL is not configured yet, the API scripts include intelligent fallback responses so the Angular DApp works seamlessly right out of the box!
+---
+
+## ⏱️ Automated Dynamic ROI Cron Job
+
+To run the automated daily APY distribution automatically at midnight UTC:
+
+### Linux Crontab:
+```bash
+0 0 * * * /usr/bin/php /path/to/backend-php/cron_daily_roi.php >> /var/log/morgan_cron.log 2>&1
+```
+
+### Remote Webhook Trigger (e.g. cPanel Cron or Cron-Job.org):
+```
+GET https://your-domain.com/backend-php/cron_daily_roi.php?key=MORGAN_CRON_SECRET_2026
+```

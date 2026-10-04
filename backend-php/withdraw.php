@@ -1,7 +1,7 @@
 <?php
 /**
  * Morgan Treasure - Withdrawal Processing API
- * Deducts 5% Liquidity Retention Fee (retained in vault reserve) and updates user balance.
+ * Deducts 5% Liquidity Retention Fee (retained in vault reserve) and updates user balance in MariaDB.
  */
 
 require_once __DIR__ . '/config.php';
@@ -11,18 +11,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $payload = getJsonPayload();
-$wallet = trim($payload['wallet_address'] ?? '');
+$wallet = strtolower(trim($payload['wallet_address'] ?? ''));
 $amountUsdt = (float)($payload['amount_usdt'] ?? 0);
 $txHash = trim($payload['tx_hash'] ?? '');
 
 // Validation
-if (empty($wallet) || !preg_match('/^0x[a-fA-F0-9]{40}$/', $wallet)) {
+if (empty($wallet) || !preg_match('/^0x[a-f0-9]{40}$/', $wallet)) {
     sendResponse('error', 'Valid BNB Chain (BEP-20) wallet address is required', null, 422);
 }
 
-$minWithdrawal = 10.0;
-if ($amountUsdt < $minWithdrawal) {
-    sendResponse('error', "Minimum withdrawal amount is {$minWithdrawal} USDT", null, 422);
+if ($amountUsdt < MIN_WITHDRAWAL_USDT) {
+    sendResponse('error', 'Minimum withdrawal amount is $' . number_format(MIN_WITHDRAWAL_USDT, 2) . ' USDT', null, 422);
 }
 
 $pdo = getDbConnection();
@@ -46,8 +45,13 @@ if (!$pdo) {
 try {
     $pdo->beginTransaction();
 
-    // 1. Fetch User Record
-    $userStmt = $pdo->prepare("SELECT id, wallet_address, user_id, available_balance_usdt, total_withdrawn_usdt FROM users WHERE wallet_address = ? FOR UPDATE");
+    // 1. Fetch User Record with Row Lock
+    $userStmt = $pdo->prepare("
+        SELECT id, wallet_address, user_id, available_balance_usdt, total_withdrawn_usdt 
+        FROM users 
+        WHERE wallet_address = ? 
+        FOR UPDATE
+    ");
     $userStmt->execute([$wallet]);
     $user = $userStmt->fetch();
 
@@ -66,7 +70,7 @@ try {
         ], 400);
     }
 
-    // 2. Calculate 5% Liquidity Retention Fee & 95% Net Payout
+    // 2. Calculate 5% Liquidity Retention Fee (2.5% Admin + 2.5% Royalty) & 95% Net Payout
     $fee = round($amountUsdt * (WITHDRAWAL_FEE_PERCENT / 100.0), 4);
     $netPayout = round($amountUsdt - $fee, 4);
 
@@ -75,20 +79,23 @@ try {
     }
 
     // 3. Deduct from Available Balance & Increase Total Withdrawn
+    $newBalance = round($availableBalance - $amountUsdt, 4);
+    $newTotalWithdrawn = round((float)$user['total_withdrawn_usdt'] + $netPayout, 4);
+
     $updUser = $pdo->prepare("
         UPDATE users 
-        SET available_balance_usdt = available_balance_usdt - ?,
-            total_withdrawn_usdt = total_withdrawn_usdt + ?
+        SET available_balance_usdt = ?,
+            total_withdrawn_usdt = ?
         WHERE id = ?
     ");
-    $updUser->execute([$amountUsdt, $amountUsdt, $user['id']]);
+    $updUser->execute([$newBalance, $newTotalWithdrawn, $user['id']]);
 
-    // 4. Record Withdrawal Transaction
+    // 4. Record Withdrawal Transaction in withdrawals table
     $insTx = $pdo->prepare("
         INSERT INTO withdrawals (
             wallet_address, user_id, gross_amount_usdt, fee_amount_usdt, 
-            net_payout_usdt, tx_hash, status
-        ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed')
+            net_payout_usdt, tx_hash, status, payment_method
+        ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', 'BEP20_USDT')
     ");
     $insTx->execute([
         $wallet,
@@ -100,6 +107,28 @@ try {
     ]);
     $withdrawalId = $pdo->lastInsertId();
 
+    // 5. Log into Master Transactions Table
+    $shortAddr = substr($wallet, 0, 6) . '...' . substr($wallet, -4);
+    logTransaction(
+        $pdo,
+        $wallet,
+        $user['user_id'],
+        'withdrawal',
+        "Withdrawal to BEP-20 Wallet ({$shortAddr})",
+        $amountUsdt,
+        $fee,
+        $netPayout,
+        'completed',
+        $txHash,
+        'BNB Chain',
+        [
+            'withdrawal_id' => $withdrawalId,
+            'fee_percent' => WITHDRAWAL_FEE_PERCENT,
+            'admin_fee' => round($fee / 2, 4),
+            'royalty_fee' => round($fee / 2, 4)
+        ]
+    );
+
     $pdo->commit();
 
     sendResponse('success', 'Withdrawal completed successfully with 5% liquidity fee retained in vault', [
@@ -110,8 +139,9 @@ try {
         'feePercent' => WITHDRAWAL_FEE_PERCENT . '%',
         'liquidityFeeUsdt' => $fee,
         'netPayoutUsdt' => $netPayout,
-        'remainingBalanceUsdt' => round($availableBalance - $amountUsdt, 4),
-        'txHash' => $txHash
+        'remainingBalanceUsdt' => $newBalance,
+        'txHash' => $txHash,
+        'status' => 'confirmed'
     ]);
 
 } catch (Exception $e) {
