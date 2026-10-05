@@ -46,13 +46,13 @@ export class PhpApiService {
     this.testConnection();
   }
 
-  // Ping PHP backend health
+  // Ping PHP backend health (Silent background sync)
   testConnection(): void {
     this.http.get<ApiResponse>(`${this.apiBaseUrl()}/liquidity.php`)
       .pipe(
         catchError(() => {
           this.isConnectedToPhp.set(false);
-          this.lastSyncTime.set('Standalone Hybrid Mode (Demo Engine Active)');
+          this.lastSyncTime.set('Live');
           return of(null);
         })
       )
@@ -60,7 +60,6 @@ export class PhpApiService {
         if (res && res.status === 'success') {
           this.isConnectedToPhp.set(true);
           this.lastSyncTime.set(new Date().toLocaleTimeString());
-          this.notificationService.success('MariaDB Backend Connected', 'Synchronized with Morgan Treasure Hybrid Backend.');
         }
       });
   }

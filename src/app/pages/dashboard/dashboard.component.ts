@@ -64,13 +64,13 @@ import { SoundService } from '../../services/sound.service';
               <ng-container *ngIf="!web3Service.isConnected()">
                 <span class="text-rose-400 font-bold">Not Connected</span>
                 <span class="text-slate-600">•</span>
-                <button
-                  (click)="web3Service.connectWallet('TrustWallet')"
+                <a
+                  routerLink="/connect"
                   class="text-amber-400 hover:text-amber-300 font-bold underline transition-colors cursor-pointer text-xs flex items-center gap-1"
                 >
                   <i class="fa-solid fa-bolt text-[10px]"></i>
                   <span>Connect Wallet</span>
-                </button>
+                </a>
               </ng-container>
             </div>
           </div>

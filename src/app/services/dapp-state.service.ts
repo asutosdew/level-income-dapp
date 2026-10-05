@@ -73,31 +73,31 @@ export class DappStateService {
 
   // Core User Profile (Morgan Treasure Investor)
   public user = signal<UserProfile>({
-    address: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-    userId: 'MT-77291',
+    address: '',
+    userId: 'Not Connected',
     sponsorId: 'MT-10024',
     sponsorAddress: '0x9b32fa99834190cbbde029104fa2841b994801ac',
-    referralCode: 'MT77291',
-    activePackageId: 'gold_500',
-    activePackageName: 'Morgan Gold ($500)',
-    totalStakedUsdt: 500,
-    availableBalanceUsdt: 218.40,
-    totalWithdrawnUsdt: 320.00,
-    totalLevelIncomeUsdt: 520.40,
-    totalDirectIncomeUsdt: 250.00,
-    totalRoiIncomeUsdt: 184.80,
-    totalRoyaltyIncomeUsdt: 95.00,
-    rank: 'Gold Treasure Leader',
-    directsCount: 9,
-    activeDirectsCount: 7,
-    totalTeamCount: 156,
-    totalTeamTurnoverUsdt: 24500,
-    strongLegVolumeUsdt: 14800,
-    otherLegsVolumeUsdt: 9700,
-    maxCappingLimitUsdt: 1500, // 300% of $500
-    totalEarningTowardsCapUsdt: 1050.20,
-    lastRoiClaimTimestamp: Date.now() - 3600000 * 8,
-    isRegistered: true
+    referralCode: '',
+    activePackageId: '',
+    activePackageName: 'No Active Package',
+    totalStakedUsdt: 0,
+    availableBalanceUsdt: 0,
+    totalWithdrawnUsdt: 0,
+    totalLevelIncomeUsdt: 0,
+    totalDirectIncomeUsdt: 0,
+    totalRoiIncomeUsdt: 0,
+    totalRoyaltyIncomeUsdt: 0,
+    rank: 'Guest',
+    directsCount: 0,
+    activeDirectsCount: 0,
+    totalTeamCount: 0,
+    totalTeamTurnoverUsdt: 0,
+    strongLegVolumeUsdt: 0,
+    otherLegsVolumeUsdt: 0,
+    maxCappingLimitUsdt: 0,
+    totalEarningTowardsCapUsdt: 0,
+    lastRoiClaimTimestamp: 0,
+    isRegistered: false
   });
 
   // Investment Packages
@@ -279,8 +279,11 @@ export class DappStateService {
     // Sync with MariaDB on account change
     effect(() => {
       const account = this.web3Service.currentAccount();
-      if (account) {
+      const connected = this.web3Service.isConnected();
+      if (connected && account) {
         this.syncWithBackend(account);
+      } else {
+        this.resetUserState();
       }
     });
 
@@ -638,16 +641,48 @@ export class DappStateService {
     }
   }
 
+  public resetUserState(): void {
+    this.user.set({
+      address: '',
+      userId: 'Not Connected',
+      sponsorId: 'MT-10024',
+      sponsorAddress: '0x9b32fa99834190cbbde029104fa2841b994801ac',
+      referralCode: '',
+      activePackageId: '',
+      activePackageName: 'No Active Package',
+      totalStakedUsdt: 0,
+      availableBalanceUsdt: 0,
+      totalWithdrawnUsdt: 0,
+      totalLevelIncomeUsdt: 0,
+      totalDirectIncomeUsdt: 0,
+      totalRoiIncomeUsdt: 0,
+      totalRoyaltyIncomeUsdt: 0,
+      rank: 'Guest',
+      directsCount: 0,
+      activeDirectsCount: 0,
+      totalTeamCount: 0,
+      totalTeamTurnoverUsdt: 0,
+      strongLegVolumeUsdt: 0,
+      otherLegsVolumeUsdt: 0,
+      maxCappingLimitUsdt: 0,
+      totalEarningTowardsCapUsdt: 0,
+      lastRoiClaimTimestamp: 0,
+      isRegistered: false
+    });
+    this.transactions.set([]);
+    this.directs.set([]);
+  }
+
   private loadState(): void {
     if (typeof localStorage !== 'undefined') {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const data = JSON.parse(raw);
-          if (data.user) this.user.set(data.user);
+          if (data.user && this.web3Service.isConnected()) this.user.set(data.user);
           if (data.currency) this.currency.set(data.currency);
           if (data.language) this.language.set(data.language);
-          if (data.transactions) this.transactions.set(data.transactions);
+          if (data.transactions && this.web3Service.isConnected()) this.transactions.set(data.transactions);
           if (data.tokenSale) this.tokenSale.set(data.tokenSale);
         }
       } catch (err) {

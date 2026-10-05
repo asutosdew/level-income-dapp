@@ -52,7 +52,7 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
             {{ web3Service.isConnected() ? 'Selected Wallet' : '1. Choose Web3 Wallet' }}
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <!-- Trust Wallet -->
             <button
               (click)="connectWallet('TrustWallet')"
@@ -79,10 +79,36 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
               <div class="text-[11px] text-slate-500 font-mono mt-0.5">Browser & App</div>
             </button>
 
+            <!-- TokenPocket -->
+            <button
+              (click)="connectWallet('TokenPocket')"
+              class="p-4 rounded-2xl bg-slate-950/80 border transition-all flex flex-col items-center text-center group cursor-pointer hover:bg-slate-900"
+              [ngClass]="web3Service.walletType() === 'TokenPocket' ? 'border-cyan-400 ring-2 ring-cyan-400/40 bg-cyan-950/20' : 'border-slate-800 hover:border-slate-700'"
+            >
+              <div class="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-2 group-hover:scale-105 transition-transform">
+                <i class="fa-solid fa-wallet"></i>
+              </div>
+              <div class="text-sm font-bold text-white">TokenPocket</div>
+              <div class="text-[11px] text-slate-500 font-mono mt-0.5">DApp Wallet</div>
+            </button>
+
+            <!-- Bitget Wallet -->
+            <button
+              (click)="connectWallet('Bitget')"
+              class="p-4 rounded-2xl bg-slate-950/80 border transition-all flex flex-col items-center text-center group cursor-pointer hover:bg-slate-900"
+              [ngClass]="web3Service.walletType() === 'Bitget' ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/20' : 'border-slate-800 hover:border-slate-700'"
+            >
+              <div class="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-2xl mb-2 group-hover:scale-105 transition-transform">
+                <i class="fa-solid fa-cube"></i>
+              </div>
+              <div class="text-sm font-bold text-white">Bitget Wallet</div>
+              <div class="text-[11px] text-slate-500 font-mono mt-0.5">Web3 App</div>
+            </button>
+
             <!-- Binance Web3 Wallet -->
             <button
               (click)="connectWallet('BinanceWeb3')"
-              class="p-4 rounded-2xl bg-slate-950/80 border transition-all flex flex-col items-center text-center group cursor-pointer hover:bg-slate-900"
+              class="p-4 rounded-2xl bg-slate-950/80 border transition-all flex flex-col items-center text-center group cursor-pointer hover:bg-slate-900 col-span-2 sm:col-span-1"
               [ngClass]="web3Service.walletType() === 'BinanceWeb3' ? 'border-amber-400 ring-2 ring-amber-400/40 bg-amber-950/20' : 'border-slate-800 hover:border-slate-700'"
             >
               <div class="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl mb-2 group-hover:scale-105 transition-transform">
@@ -90,19 +116,6 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
               </div>
               <div class="text-sm font-bold text-white">Binance Web3</div>
               <div class="text-[11px] text-slate-500 font-mono mt-0.5">Binance App</div>
-            </button>
-
-            <!-- Instant Demo Mode -->
-            <button
-              (click)="connectWallet('Demo')"
-              class="p-4 rounded-2xl bg-slate-950/80 border transition-all flex flex-col items-center text-center group cursor-pointer hover:bg-slate-900"
-              [ngClass]="web3Service.walletType() === 'Demo' ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/20' : 'border-slate-800 hover:border-slate-700'"
-            >
-              <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-2xl mb-2 group-hover:scale-105 transition-transform">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-              </div>
-              <div class="text-sm font-bold text-emerald-300">Instant Demo</div>
-              <div class="text-[11px] text-slate-400 font-mono mt-0.5">2,500 USDT</div>
             </button>
           </div>
 
@@ -240,8 +253,8 @@ export class ConnectRegisterComponent implements OnInit {
     });
   }
 
-  async connectWallet(walletType: 'MetaMask' | 'TrustWallet' | 'BinanceWeb3' | 'Demo'): Promise<void> {
-    const success = await this.web3Service.connectWallet(walletType as any);
+  async connectWallet(walletType: 'MetaMask' | 'TrustWallet' | 'TokenPocket' | 'Bitget' | 'BinanceWeb3'): Promise<void> {
+    const success = await this.web3Service.connectWallet(walletType);
     if (success) {
       this.soundService.playSuccess();
     }
