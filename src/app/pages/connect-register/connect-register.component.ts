@@ -210,10 +210,10 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
             </button>
           </form>
 
-          <!-- Direct Dashboard Link -->
-          <div class="text-center pt-2">
+          <!-- Direct Dashboard Link (Only if registered) -->
+          <div *ngIf="dappState.user().isRegistered" class="text-center pt-2">
             <a routerLink="/dashboard" class="text-xs text-amber-400 hover:text-amber-300 font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5">
-              <span>Skip to Dashboard</span>
+              <span>Go to Dashboard</span>
               <i class="fa-solid fa-arrow-right text-[10px]"></i>
             </a>
           </div>
@@ -266,6 +266,16 @@ export class ConnectRegisterComponent implements OnInit {
   }
 
   async handleRegister(): Promise<void> {
+    if (!this.web3Service.isConnected() || !this.web3Service.currentAccount()) {
+      this.notificationService.error('Wallet Required', 'Please connect your Web3 wallet before registering.');
+      return;
+    }
+
+    if (!this.sponsorId || !this.sponsorId.trim()) {
+      this.notificationService.warning('Sponsor Required', 'Please enter a Sponsor Referral ID (e.g. MT-10024).');
+      return;
+    }
+
     if (!this.agreedToTerms) {
       this.notificationService.warning('Agreement Required', 'Please accept the dynamic ROI terms.');
       return;
@@ -275,20 +285,25 @@ export class ConnectRegisterComponent implements OnInit {
 
     this.phpApi.register({
       wallet_address: this.web3Service.currentAccount(),
-      sponsor_id: this.sponsorId,
-      nickname: this.nickname
+      sponsor_id: this.sponsorId.trim().toUpperCase(),
+      nickname: this.nickname.trim()
     }).subscribe({
-      next: () => {
-        this.dappState.registerUser(this.sponsorId, this.nickname);
-        this.dappState.syncWithBackend();
+      next: (res) => {
         this.isSubmitting.set(false);
-        this.notificationService.success('Registration Complete', 'Welcome to Morgan Treasure!');
-        this.router.navigate(['/dashboard']);
+        if (res && res.status === 'success') {
+          this.dappState.registerUser(this.sponsorId.trim().toUpperCase(), this.nickname);
+          this.dappState.syncWithBackend();
+          this.soundService.playSuccess();
+          this.notificationService.success('Registration Complete', 'Welcome to Morgan Treasure! Account linked to ' + this.sponsorId);
+          this.router.navigate(['/dashboard']);
+        } else {
+          this.notificationService.error('Registration Failed', res?.message || 'Could not complete registration.');
+        }
       },
-      error: () => {
-        this.dappState.registerUser(this.sponsorId, this.nickname);
+      error: (err) => {
         this.isSubmitting.set(false);
-        this.router.navigate(['/dashboard']);
+        const errMsg = err?.error?.message || 'Registration error occurred. Please verify sponsor ID and retry.';
+        this.notificationService.error('Registration Error', errMsg);
       }
     });
   }

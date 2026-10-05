@@ -78,7 +78,7 @@ import { SoundService } from '../../services/sound.service';
           <!-- Fast Action CTA Buttons -->
           <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <a
-              routerLink="/deposit"
+              [routerLink]="dappState.user().isRegistered ? '/deposit' : '/connect'"
               class="btn-gold-glow flex-1 md:flex-initial py-3.5 px-6 text-sm font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/25"
             >
               <i class="fa-solid fa-plus text-xs"></i>
@@ -93,6 +93,26 @@ import { SoundService } from '../../services/sound.service';
             </a>
           </div>
         </div>
+      </div>
+
+      <!-- Registration Required Warning Banner for Unregistered Wallets -->
+      <div *ngIf="web3Service.isConnected() && !dappState.user().isRegistered" class="p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 border border-amber-500/40 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl shrink-0">
+            <i class="fa-solid fa-id-card"></i>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-white flex items-center gap-2">
+              <span>Registration Required with Sponsor ID</span>
+              <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-mono">ACTION NEEDED</span>
+            </div>
+            <div class="text-xs text-slate-300 mt-0.5">Your wallet is connected, but you have not registered in our database yet. You must register under a Sponsor before you can stake USDT or earn daily rewards.</div>
+          </div>
+        </div>
+        <a routerLink="/connect" class="btn-gold-glow px-5 py-3 rounded-xl text-xs font-black shrink-0 whitespace-nowrap shadow-md shadow-amber-500/20">
+          <span>Register Now</span>
+          <i class="fa-solid fa-arrow-right text-[10px] ml-1.5"></i>
+        </a>
       </div>
 
       <!-- ================================================================= -->

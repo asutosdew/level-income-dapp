@@ -50,17 +50,29 @@ try {
     $user = $stmt->fetch();
 
     if (!$user) {
-        // Auto register if user visits for first time
-        $userId = 'MT-' . rand(10000, 99999);
-        $insert = $pdo->prepare("
-            INSERT INTO users (wallet_address, user_id, sponsor_id, sponsor_address, nickname, rank, is_registered) 
-            VALUES (?, ?, 'MT-10024', '0x9b32fa99834190cbbde029104fa2841b994801ac', ?, 'Treasure Explorer', 1)
-        ");
-        $nickname = 'Investor ' . substr($address, 2, 4);
-        $insert->execute([$address, $userId, $nickname]);
-
-        $stmt->execute([$address]);
-        $user = $stmt->fetch();
+        sendResponse('success', 'Wallet address is not registered in protocol', [
+            'address' => $address,
+            'isRegistered' => false,
+            'userId' => null,
+            'sponsorId' => null,
+            'totalStakedUsdt' => 0,
+            'availableBalanceUsdt' => 0,
+            'totalWithdrawnUsdt' => 0,
+            'totalLevelIncomeUsdt' => 0,
+            'totalDirectIncomeUsdt' => 0,
+            'totalRoiIncomeUsdt' => 0,
+            'totalRoyaltyIncomeUsdt' => 0,
+            'rank' => 'Unregistered',
+            'directsCount' => 0,
+            'activeDirectsCount' => 0,
+            'totalTeamCount' => 0,
+            'totalTeamTurnoverUsdt' => 0,
+            'strongLegVolumeUsdt' => 0,
+            'otherLegsVolumeUsdt' => 0,
+            'maxCappingLimitUsdt' => 0,
+            'totalEarningTowardsCapUsdt' => 0,
+            'activePackageName' => 'No Active Package'
+        ]);
     }
 
     // Calculate Leg Volumes (Strong Leg vs Other Legs)

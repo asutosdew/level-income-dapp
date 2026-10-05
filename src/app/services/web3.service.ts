@@ -285,15 +285,56 @@ export class Web3Service {
     }
   }
 
-  // BEP-20 USDT Approval
-  async approveUsdt(amountUsdt: number): Promise<{ success: boolean; txHash: string }> {
+  // Get numeric balances for calculations
+  getNumericUsdtBalance(): number {
+    const raw = this.usdtBalance().replace(/[^0-9.]/g, '');
+    return parseFloat(raw) || 0;
+  }
+
+  getNumericBnbBalance(): number {
+    const raw = this.bnbBalance().replace(/[^0-9.]/g, '');
+    return parseFloat(raw) || 0;
+  }
+
+  // Wait for on-chain receipt confirmation on BNB Chain
+  async waitForTransactionReceipt(txHash: string, provider: any, maxWaitMs = 25000): Promise<any> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWaitMs) {
+      try {
+        const receipt = await provider.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHash]
+        });
+        if (receipt && receipt.blockNumber) {
+          return receipt;
+        }
+      } catch (err) {
+        // Continue polling
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    return null;
+  }
+
+  // BEP-20 USDT Approval (Real on-chain transaction)
+  async approveUsdt(amountUsdt: number): Promise<{ success: boolean; txHash: string; error?: string }> {
     this.soundService.playTap();
     const account = this.currentAccount();
     const provider = (window as any).ethereum;
 
     if (!account || !provider) {
       this.notificationService.error('Wallet Required', 'Please connect your Web3 wallet first.');
-      return { success: false, txHash: '' };
+      return { success: false, txHash: '', error: 'Wallet not connected' };
+    }
+
+    // Strict balance check before approval
+    const currentUsdt = this.getNumericUsdtBalance();
+    if (currentUsdt < amountUsdt) {
+      this.notificationService.error(
+        'Insufficient USDT Balance',
+        `Your wallet balance is $${currentUsdt.toFixed(2)} USDT, but $${amountUsdt.toFixed(2)} USDT is required.`
+      );
+      return { success: false, txHash: '', error: 'Insufficient USDT balance' };
     }
 
     try {
@@ -314,30 +355,55 @@ export class Web3Service {
         ]
       })) as string;
 
-      this.notificationService.success('USDT Approved', `Transaction submitted: ${this.formatAddress(txHash)}`);
+      this.notificationService.info('Approval Submitted', `Waiting for confirmation on BNB Chain: ${this.formatAddress(txHash)}`);
+      
+      const receipt = await this.waitForTransactionReceipt(txHash, provider);
+      if (receipt && receipt.status === '0x0') {
+        this.notificationService.error('Approval Reverted', 'USDT token approval reverted on BNB Chain.');
+        return { success: false, txHash: '', error: 'Approval reverted' };
+      }
+
+      this.notificationService.success('USDT Approved', `Successfully approved $${amountUsdt} USDT.`);
       return { success: true, txHash };
     } catch (err: any) {
       if (err?.code === 4001) {
-        this.notificationService.warning('Rejected', 'User rejected USDT approval transaction.');
+        this.notificationService.warning('Rejected', 'User cancelled or rejected USDT approval in wallet.');
       } else {
-        // Fallback for simulation / mock test environments
-        const fallbackHash = this.generateTxHash();
-        this.notificationService.success('USDT Approved', `Approved $${amountUsdt} USDT for Morgan Treasure vault.`);
-        return { success: true, txHash: fallbackHash };
+        this.notificationService.error('Approval Failed', err?.message || 'USDT approval failed on BNB Chain.');
       }
-      return { success: false, txHash: '' };
+      return { success: false, txHash: '', error: err?.message || 'Approval failed' };
     }
   }
 
-  // Staking Deposit Call
-  async executeDepositContract(amountUsdt: number, sponsorAddress: string): Promise<{ success: boolean; txHash: string }> {
+  // Staking Deposit Call (Real on-chain transaction)
+  async executeDepositContract(amountUsdt: number, sponsorAddress: string): Promise<{ success: boolean; txHash: string; error?: string }> {
     this.soundService.playTap();
     const account = this.currentAccount();
     const provider = (window as any).ethereum;
 
     if (!account || !provider) {
       this.notificationService.error('Wallet Required', 'Please connect your Web3 wallet first.');
-      return { success: false, txHash: '' };
+      return { success: false, txHash: '', error: 'Wallet not connected' };
+    }
+
+    // Strict on-chain USDT balance check
+    const currentUsdt = this.getNumericUsdtBalance();
+    if (currentUsdt < amountUsdt) {
+      this.notificationService.error(
+        'Insufficient USDT Balance',
+        `Your wallet has $${currentUsdt.toFixed(2)} USDT, but you need at least $${amountUsdt.toFixed(2)} USDT to stake this package.`
+      );
+      return { success: false, txHash: '', error: 'Insufficient USDT' };
+    }
+
+    // Check BNB for gas
+    const currentBnb = this.getNumericBnbBalance();
+    if (currentBnb < 0.0004) {
+      this.notificationService.error(
+        'Insufficient BNB for Gas',
+        'You need at least 0.0005 BNB in your wallet to pay for transaction gas on BNB Chain.'
+      );
+      return { success: false, txHash: '', error: 'Insufficient BNB for gas' };
     }
 
     try {
@@ -361,30 +427,49 @@ export class Web3Service {
         ]
       })) as string;
 
+      this.notificationService.info('Staking Submitted', `Deposit submitted to BNB Chain: ${this.formatAddress(txHash)}`);
+
+      // Wait for receipt confirmation
+      const receipt = await this.waitForTransactionReceipt(txHash, provider);
+      if (receipt && receipt.status === '0x0') {
+        this.notificationService.error('Staking Reverted', 'The staking deposit transaction was reverted on BNB Chain.');
+        return { success: false, txHash: '', error: 'Transaction reverted on-chain' };
+      }
+
+      await this.refreshBalances();
       return { success: true, txHash };
     } catch (err: any) {
       if (err?.code === 4001) {
-        this.notificationService.warning('Rejected', 'Transaction was rejected by user.');
-        return { success: false, txHash: '' };
+        this.notificationService.warning('Rejected', 'User cancelled the deposit transaction in wallet.');
+      } else {
+        this.notificationService.error('Transaction Failed', err?.message || 'Deposit failed on BNB Chain.');
       }
-      const fallbackHash = this.generateTxHash();
-      return { success: true, txHash: fallbackHash };
+      return { success: false, txHash: '', error: err?.message || 'Deposit failed' };
     }
   }
 
-  // Swap BNB or USDT for MTG Tokens
-  async executeTokenSwap(amount: number, tokenFrom: 'BNB' | 'USDT'): Promise<{ success: boolean; txHash: string }> {
+  // Swap BNB or USDT for MTG Tokens (Real on-chain transaction)
+  async executeTokenSwap(amount: number, tokenFrom: 'BNB' | 'USDT'): Promise<{ success: boolean; txHash: string; error?: string }> {
     this.soundService.playTap();
     const account = this.currentAccount();
     const provider = (window as any).ethereum;
 
     if (!account || !provider) {
       this.notificationService.error('Wallet Required', 'Please connect your Web3 wallet first.');
-      return { success: false, txHash: '' };
+      return { success: false, txHash: '', error: 'Wallet not connected' };
     }
 
-    try {
-      if (tokenFrom === 'BNB') {
+    if (tokenFrom === 'BNB') {
+      const currentBnb = this.getNumericBnbBalance();
+      if (currentBnb < amount + 0.0005) {
+        this.notificationService.error(
+          'Insufficient BNB',
+          `You need ${amount} BNB + gas, but your balance is ${currentBnb.toFixed(4)} BNB.`
+        );
+        return { success: false, txHash: '', error: 'Insufficient BNB' };
+      }
+
+      try {
         const rawWei = BigInt(Math.floor(amount * 1e18));
         const txHash = (await provider.request({
           method: 'eth_sendTransaction',
@@ -396,17 +481,62 @@ export class Web3Service {
             }
           ]
         })) as string;
+
+        await this.waitForTransactionReceipt(txHash, provider);
+        await this.refreshBalances();
         return { success: true, txHash };
+      } catch (err: any) {
+        if (err?.code === 4001) {
+          this.notificationService.warning('Rejected', 'Token purchase cancelled in wallet.');
+        } else {
+          this.notificationService.error('Swap Failed', err?.message || 'BNB swap failed.');
+        }
+        return { success: false, txHash: '', error: err?.message };
       }
-    } catch (err: any) {
-      if (err?.code === 4001) {
-        this.notificationService.warning('Rejected', 'Token purchase rejected.');
-        return { success: false, txHash: '' };
+    } else {
+      // USDT Swap
+      const currentUsdt = this.getNumericUsdtBalance();
+      if (currentUsdt < amount) {
+        this.notificationService.error(
+          'Insufficient USDT',
+          `Your wallet has $${currentUsdt.toFixed(2)} USDT, but $${amount.toFixed(2)} USDT is needed.`
+        );
+        return { success: false, txHash: '', error: 'Insufficient USDT' };
+      }
+
+      const approveRes = await this.approveUsdt(amount);
+      if (!approveRes.success) {
+        return { success: false, txHash: '', error: 'USDT approval required' };
+      }
+
+      try {
+        const rawUnits = BigInt(Math.floor(amount * 1e6)) * BigInt(1e12);
+        const amountHex = rawUnits.toString(16).padStart(64, '0');
+        const data = '0x47e7ef24' + amountHex + '0'.repeat(64); // swap call
+
+        const txHash = (await provider.request({
+          method: 'eth_sendTransaction',
+          params: [
+            {
+              from: account,
+              to: this.morganTreasureVault,
+              data: data
+            }
+          ]
+        })) as string;
+
+        await this.waitForTransactionReceipt(txHash, provider);
+        await this.refreshBalances();
+        return { success: true, txHash };
+      } catch (err: any) {
+        if (err?.code === 4001) {
+          this.notificationService.warning('Rejected', 'USDT swap cancelled in wallet.');
+        } else {
+          this.notificationService.error('Swap Failed', err?.message || 'USDT swap failed.');
+        }
+        return { success: false, txHash: '', error: err?.message };
       }
     }
-
-    const fallbackHash = this.generateTxHash();
-    return { success: true, txHash: fallbackHash };
   }
 
   disconnect(): void {

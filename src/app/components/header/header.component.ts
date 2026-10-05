@@ -123,6 +123,16 @@ import { MorganTreasureLogoComponent } from '../logo/morgan-treasure-logo.compon
                   <i class="fa-solid fa-chevron-down text-[9px] text-slate-400 ml-0.5"></i>
                 </button>
 
+                <a
+                  *ngIf="!dappState.user().isRegistered"
+                  routerLink="/connect"
+                  class="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-sm animate-pulse"
+                  title="Complete registration with Sponsor ID"
+                >
+                  <i class="fa-solid fa-user-plus text-xs"></i>
+                  <span>Register</span>
+                </a>
+
                 <button
                   (click)="disconnectWallet()"
                   class="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 hover:border-rose-500/50 text-rose-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-sm"
@@ -160,8 +170,19 @@ import { MorganTreasureLogoComponent } from '../logo/morgan-treasure-logo.compon
               </span>
             </button>
 
-            <!-- Action Controls: Copy & Disconnect -->
+            <!-- Action Controls: Register, Copy & Disconnect -->
             <div class="flex items-center gap-1.5 shrink-0">
+              <!-- Quick Register Button if not registered -->
+              <a
+                *ngIf="!dappState.user().isRegistered"
+                routerLink="/connect"
+                class="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 animate-pulse"
+                title="Register with Sponsor ID"
+              >
+                <i class="fa-solid fa-user-plus text-xs"></i>
+                <span class="text-[11px]">Register</span>
+              </a>
+
               <!-- Quick Copy Button -->
               <button
                 (click)="copyAddress()"

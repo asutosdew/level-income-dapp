@@ -25,43 +25,41 @@ if (!in_array($paidCurrency, ['BNB', 'USDT'])) {
     sendResponse('error', 'Paid currency must be BNB or USDT', null, 422);
 }
 
-if (empty($txHash)) {
-    $txHash = '0x' . bin2hex(random_bytes(32));
+if (empty($txHash) || !preg_match('/^0x[a-fA-F0-9]{64}$/', $txHash)) {
+    sendResponse('error', 'Valid 64-character on-chain transaction hash is required.', null, 422);
 }
 
 $pdo = getDbConnection();
+
+if (!$pdo) {
+    sendResponse('error', 'Database service temporarily unavailable. Please retry shortly.', null, 503);
+}
+
+// Replay protection
+$chkTx = $pdo->prepare("SELECT id FROM token_orders WHERE tx_hash = ? UNION SELECT id FROM transactions WHERE tx_hash = ?");
+$chkTx->execute([$txHash, $txHash]);
+if ($chkTx->fetch()) {
+    sendResponse('error', 'This token purchase transaction has already been processed.', null, 409);
+}
 
 // Equivalent USDT value
 $usdtValue = ($paidCurrency === 'USDT') ? $paidAmount : ($paidAmount * BNB_PRICE_USDT);
 $fee = ($paidCurrency === 'BNB') ? 0.0015 * BNB_PRICE_USDT : 0.40;
 
-// Offline fallback simulation
-if (!$pdo) {
-    sendResponse('success', 'Token purchase recorded (Simulated Demo)', [
-        'walletAddress' => $wallet,
-        'tokensAmount' => $tokensAmount,
-        'tokenSymbol' => 'MTG',
-        'paidAmount' => $paidAmount,
-        'paidCurrency' => $paidCurrency,
-        'usdtValue' => round($usdtValue, 2),
-        'txHash' => $txHash,
-        'status' => 'completed'
-    ]);
-}
-
 try {
     $pdo->beginTransaction();
 
-    // 1. Fetch User Record
-    $uStmt = $pdo->prepare("SELECT id, user_id FROM users WHERE wallet_address = ?");
+    // 1. Fetch User Record (Must be registered)
+    $uStmt = $pdo->prepare("SELECT id, user_id, is_registered FROM users WHERE wallet_address = ?");
     $uStmt->execute([$wallet]);
     $user = $uStmt->fetch();
-    $userId = $user ? $user['user_id'] : 'MT-' . rand(10000, 99999);
 
-    if (!$user) {
-        $ins = $pdo->prepare("INSERT INTO users (wallet_address, user_id, sponsor_id) VALUES (?, ?, 'MT-10024')");
-        $ins->execute([$wallet, $userId]);
+    if (!$user || (int)($user['is_registered'] ?? 0) !== 1) {
+        $pdo->rollBack();
+        sendResponse('error', 'Wallet not registered. Please register with a sponsor ID first before purchasing MTG tokens.', null, 403);
     }
+
+    $userId = $user['user_id'];
 
     // 2. Insert into token_orders table
     $insOrder = $pdo->prepare("

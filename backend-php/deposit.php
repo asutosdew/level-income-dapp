@@ -25,31 +25,36 @@ if ($amountUsdt < MIN_DEPOSIT_USDT) {
     sendResponse('error', 'Minimum stake amount is $' . MIN_DEPOSIT_USDT . ' USDT', null, 422);
 }
 
-if (empty($txHash)) {
-    $txHash = '0x' . bin2hex(random_bytes(32));
+if (empty($txHash) || !preg_match('/^0x[a-fA-F0-9]{64}$/', $txHash)) {
+    sendResponse('error', 'A valid on-chain blockchain transaction hash (64 hex characters) is required to stake.', null, 422);
 }
 
 $pdo = getDbConnection();
 
-// Fallback offline simulation if DB connection is unavailable
 if (!$pdo) {
-    sendResponse('success', 'Deposit confirmed (Simulated Mode)', [
-        'wallet' => $wallet,
-        'amountUsdt' => $amountUsdt,
-        'packageId' => $packageId,
-        'txHash' => $txHash,
-        'maxCappingLimitUsdt' => $amountUsdt * MAX_CAPPING_MULTIPLIER,
-        'commissionDistributedTiers' => 15
-    ]);
+    sendResponse('error', 'Database service temporarily unavailable. Please retry shortly.', null, 503);
+}
+
+// 0. Replay Protection: Ensure transaction hash has never been credited before
+$chkTx = $pdo->prepare("SELECT id FROM deposits WHERE tx_hash = ? UNION SELECT id FROM transactions WHERE tx_hash = ?");
+$chkTx->execute([$txHash, $txHash]);
+if ($chkTx->fetch()) {
+    sendResponse('error', 'This blockchain transaction has already been processed and credited.', null, 409);
+}
+
+// Optional On-chain verification: check if transaction was reverted on BSC
+$bscCheck = verifyBscTransactionReceipt($txHash);
+if (!$bscCheck['valid'] && $bscCheck['error'] === 'Transaction reverted on BNB Chain') {
+    sendResponse('error', 'This transaction was reverted/failed on BNB Chain. Staking deposit cannot be credited.', null, 400);
 }
 
 try {
     $pdo->beginTransaction();
 
-    // 1. Fetch or Auto-Register Depositing User
+    // 1. Fetch Depositing User (Must already be registered via Sponsor ID!)
     $uStmt = $pdo->prepare("
         SELECT id, wallet_address, user_id, sponsor_id, sponsor_address, 
-               total_staked_usdt, max_capping_limit_usdt, is_active 
+               total_staked_usdt, max_capping_limit_usdt, is_active, is_registered 
         FROM users 
         WHERE wallet_address = ? 
         FOR UPDATE
@@ -57,39 +62,25 @@ try {
     $uStmt->execute([$wallet]);
     $user = $uStmt->fetch();
 
-    $isFirstDeposit = false;
-
-    if (!$user) {
-        $userId = 'MT-' . rand(10000, 99999);
-        $insUser = $pdo->prepare("
-            INSERT INTO users (
-                wallet_address, user_id, sponsor_id, sponsor_address, 
-                total_staked_usdt, max_capping_limit_usdt, active_package_id, is_active
-            ) VALUES (?, ?, 'MT-10024', '0x9b32fa99834190cbbde029104fa2841b994801ac', ?, ?, ?, 1)
-        ");
-        $newTotalStaked = $amountUsdt;
-        $newMaxCap = $amountUsdt * MAX_CAPPING_MULTIPLIER;
-        $insUser->execute([$wallet, $userId, $newTotalStaked, $newMaxCap, $packageId]);
-        
-        $uStmt->execute([$wallet]);
-        $user = $uStmt->fetch();
-        $isFirstDeposit = true;
-    } else {
-        $wasActive = (int)$user['is_active'];
-        $isFirstDeposit = ($wasActive === 0 && (float)$user['total_staked_usdt'] == 0);
-        $newTotalStaked = (float)$user['total_staked_usdt'] + $amountUsdt;
-        $newMaxCap = $newTotalStaked * MAX_CAPPING_MULTIPLIER;
-
-        $updUser = $pdo->prepare("
-            UPDATE users 
-            SET total_staked_usdt = ?,
-                max_capping_limit_usdt = ?,
-                active_package_id = ?,
-                is_active = 1
-            WHERE id = ?
-        ");
-        $updUser->execute([$newTotalStaked, $newMaxCap, $packageId, $user['id']]);
+    if (!$user || (int)($user['is_registered'] ?? 0) !== 1) {
+        $pdo->rollBack();
+        sendResponse('error', 'Wallet not registered in protocol. Please complete registration with a sponsor ID first before staking.', null, 403);
     }
+
+    $wasActive = (int)$user['is_active'];
+    $isFirstDeposit = ($wasActive === 0 && (float)$user['total_staked_usdt'] == 0);
+    $newTotalStaked = (float)$user['total_staked_usdt'] + $amountUsdt;
+    $newMaxCap = $newTotalStaked * MAX_CAPPING_MULTIPLIER;
+
+    $updUser = $pdo->prepare("
+        UPDATE users 
+        SET total_staked_usdt = ?,
+            max_capping_limit_usdt = ?,
+            active_package_id = ?,
+            is_active = 1
+        WHERE id = ?
+    ");
+    $updUser->execute([$newTotalStaked, $newMaxCap, $packageId, $user['id']]);
 
     // If first active deposit, update direct sponsor active_directs_count
     if ($isFirstDeposit && !empty($user['sponsor_id'])) {

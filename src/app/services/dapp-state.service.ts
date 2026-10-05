@@ -17,6 +17,7 @@ import { NotificationService } from './notification.service';
 import { SoundService } from './sound.service';
 import { Web3Service } from './web3.service';
 import { PhpApiService } from './php-api.service';
+import { Router } from '@angular/router';
 
 const STORAGE_KEY = 'morgantreasure_dapp_v1';
 const INR_CONVERSION_RATE = 90; // 1 USDT = 90 INR
@@ -270,7 +271,8 @@ export class DappStateService {
     private notificationService: NotificationService,
     private soundService: SoundService,
     private web3Service: Web3Service,
-    private phpApi: PhpApiService
+    private phpApi: PhpApiService,
+    private router: Router
   ) {
     this.loadState();
     this.startCountdownTimer();
@@ -299,26 +301,66 @@ export class DappStateService {
     if (!address) return;
 
     this.phpApi.getUserProfile(address).subscribe(profile => {
-      if (profile) {
+      if (profile && profile.isRegistered) {
         this.user.set(profile);
-      }
-    });
 
-    this.phpApi.getTransactions(address).subscribe(txs => {
-      if (txs && txs.length > 0) {
-        this.transactions.set(txs);
-      }
-    });
+        this.phpApi.getTransactions(address).subscribe(txs => {
+          if (txs && txs.length > 0) {
+            this.transactions.set(txs);
+          }
+        });
 
-    this.phpApi.getTeam(address).subscribe(team => {
-      if (team && team.directs && team.directs.length > 0) {
-        this.directs.set(team.directs);
-      }
-    });
+        this.phpApi.getTeam(address).subscribe(team => {
+          if (team && team.directs && team.directs.length > 0) {
+            this.directs.set(team.directs);
+          }
+        });
 
-    this.phpApi.getLevelIncome(address).subscribe(tiers => {
-      if (tiers && tiers.length > 0) {
-        this.levelTiers.set(tiers);
+        this.phpApi.getLevelIncome(address).subscribe(tiers => {
+          if (tiers && tiers.length > 0) {
+            this.levelTiers.set(tiers);
+          }
+        });
+      } else {
+        // User not registered in MariaDB!
+        this.user.set({
+          address: address,
+          userId: 'Unregistered',
+          sponsorId: 'MT-10024',
+          sponsorAddress: '0x9b32fa99834190cbbde029104fa2841b994801ac',
+          referralCode: '',
+          activePackageId: '',
+          activePackageName: 'No Active Package',
+          totalStakedUsdt: 0,
+          availableBalanceUsdt: 0,
+          totalWithdrawnUsdt: 0,
+          totalLevelIncomeUsdt: 0,
+          totalDirectIncomeUsdt: 0,
+          totalRoiIncomeUsdt: 0,
+          totalRoyaltyIncomeUsdt: 0,
+          rank: 'Guest',
+          directsCount: 0,
+          activeDirectsCount: 0,
+          totalTeamCount: 0,
+          totalTeamTurnoverUsdt: 0,
+          strongLegVolumeUsdt: 0,
+          otherLegsVolumeUsdt: 0,
+          maxCappingLimitUsdt: 0,
+          totalEarningTowardsCapUsdt: 0,
+          lastRoiClaimTimestamp: 0,
+          isRegistered: false
+        });
+        this.transactions.set([]);
+        this.directs.set([]);
+
+        // Redirect to registration page if not already there
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/connect')) {
+          this.notificationService.info(
+            'Registration Required',
+            'Your wallet is not registered yet. Please enter a Sponsor ID to register first.'
+          );
+          this.router.navigate(['/connect']);
+        }
       }
     });
 

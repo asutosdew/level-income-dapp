@@ -1,6 +1,7 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { DappStateService } from '../../services/dapp-state.service';
 import { Web3Service } from '../../services/web3.service';
 import { PhpApiService } from '../../services/php-api.service';
@@ -398,8 +399,26 @@ export class DepositFundComponent {
     public web3Service: Web3Service,
     private phpApi: PhpApiService,
     private notificationService: NotificationService,
-    private soundService: SoundService
+    private soundService: SoundService,
+    private router: Router
   ) {}
+
+  ngOnInit(): void {
+    if (!this.web3Service.isConnected()) {
+      this.notificationService.warning('Wallet Disconnected', 'Please connect your Web3 wallet first.');
+      this.router.navigate(['/connect']);
+      return;
+    }
+
+    if (!this.dappState.user().isRegistered) {
+      this.notificationService.warning(
+        'Registration Required',
+        'Your wallet is not registered. Please register with a Sponsor ID first before staking.'
+      );
+      this.router.navigate(['/connect']);
+      return;
+    }
+  }
 
   currentRoiRate(): number {
     return this.dappState.liquidityPool().currentDailyRoiPercent;
@@ -423,6 +442,15 @@ export class DepositFundComponent {
   }
 
   async handleApprove(): Promise<void> {
+    const currentUsdt = this.web3Service.getNumericUsdtBalance();
+    if (currentUsdt < this.selectedAmount) {
+      this.notificationService.error(
+        'Insufficient USDT Balance',
+        `Your wallet has $${currentUsdt.toFixed(2)} USDT. You need at least $${this.selectedAmount.toFixed(2)} USDT.`
+      );
+      return;
+    }
+
     this.isApproving.set(true);
     const res = await this.web3Service.approveUsdt(this.selectedAmount);
     this.isApproving.set(false);
@@ -432,61 +460,167 @@ export class DepositFundComponent {
   }
 
   async handleDeposit(): Promise<void> {
+    if (!this.web3Service.isConnected() || !this.web3Service.currentAccount()) {
+      this.notificationService.error('Wallet Required', 'Please connect your Web3 wallet first.');
+      this.router.navigate(['/connect']);
+      return;
+    }
+
+    if (!this.dappState.user().isRegistered) {
+      this.notificationService.error('Registration Required', 'Please complete your registration with a Sponsor ID first.');
+      this.router.navigate(['/connect']);
+      return;
+    }
+
     if (this.selectedAmount < 50) {
       this.notificationService.error('Minimum Deposit', 'Minimum stake amount is $50 USDT.');
       return;
     }
 
+    // 1. Strict On-chain USDT Balance Check
+    const currentUsdt = this.web3Service.getNumericUsdtBalance();
+    if (currentUsdt < this.selectedAmount) {
+      this.notificationService.error(
+        'Insufficient USDT Balance',
+        `Your wallet balance is $${currentUsdt.toFixed(2)} USDT, but this package requires $${this.selectedAmount.toFixed(2)} USDT. Please fund your wallet on BNB Chain.`
+      );
+      return;
+    }
+
+    // 2. Strict BNB Gas Check
+    const currentBnb = this.web3Service.getNumericBnbBalance();
+    if (currentBnb < 0.0004) {
+      this.notificationService.error(
+        'Insufficient BNB for Gas',
+        'You need at least 0.0005 BNB in your wallet to cover network transaction fees on BNB Smart Chain.'
+      );
+      return;
+    }
+
     this.isDepositing.set(true);
 
+    // 3. Real On-chain USDT Approval
+    const approveRes = await this.web3Service.approveUsdt(this.selectedAmount);
+    if (!approveRes.success) {
+      this.isDepositing.set(false);
+      return;
+    }
+
+    // 4. Real On-chain Staking Deposit
     const contractRes = await this.web3Service.executeDepositContract(
       this.selectedAmount,
       this.dappState.user().sponsorAddress
     );
 
-    if (contractRes.success) {
-      this.phpApi.recordDeposit({
-        wallet_address: this.web3Service.currentAccount(),
-        amount_usdt: this.selectedAmount,
-        package_id: 'custom_' + this.selectedAmount,
-        tx_hash: contractRes.txHash
-      }).subscribe({
-        next: () => this.dappState.syncWithBackend(),
-        error: () => {}
-      });
-
-      this.dappState.depositUsdt(this.selectedAmount, this.selectedPackageName);
+    if (!contractRes.success || !contractRes.txHash) {
       this.isDepositing.set(false);
+      return;
     }
+
+    // 5. Submit real confirmed on-chain transaction hash to MariaDB backend
+    this.phpApi.recordDeposit({
+      wallet_address: this.web3Service.currentAccount(),
+      amount_usdt: this.selectedAmount,
+      package_id: 'pkg_' + this.selectedAmount,
+      tx_hash: contractRes.txHash
+    }).subscribe({
+      next: (res) => {
+        if (res && res.status === 'success') {
+          this.dappState.depositUsdt(this.selectedAmount, this.selectedPackageName);
+          this.dappState.syncWithBackend();
+          this.soundService.playSuccess();
+          this.notificationService.success(
+            'Staking Activated!',
+            `Successfully staked $${this.selectedAmount} USDT. Tx: ${this.web3Service.formatAddress(contractRes.txHash)}`
+          );
+        } else {
+          this.notificationService.error('Deposit Error', res?.message || 'Failed to record deposit in database.');
+        }
+        this.isDepositing.set(false);
+      },
+      error: (err) => {
+        this.isDepositing.set(false);
+        const errMsg = err?.error?.message || 'Deposit recording rejected by backend.';
+        this.notificationService.error('Staking Verification Failed', errMsg);
+      }
+    });
   }
 
   async handleBuyTokens(): Promise<void> {
-    if (this.payAmount <= 0) return;
+    if (!this.web3Service.isConnected() || !this.web3Service.currentAccount()) {
+      this.notificationService.error('Wallet Required', 'Please connect your Web3 wallet first.');
+      this.router.navigate(['/connect']);
+      return;
+    }
+
+    if (!this.dappState.user().isRegistered) {
+      this.notificationService.error('Registration Required', 'Please complete your registration with a Sponsor ID first.');
+      this.router.navigate(['/connect']);
+      return;
+    }
+
+    if (this.payAmount <= 0) {
+      this.notificationService.error('Invalid Amount', 'Please enter a valid amount.');
+      return;
+    }
+
+    // Strict balance checks
+    if (this.payMethod === 'USDT') {
+      const currentUsdt = this.web3Service.getNumericUsdtBalance();
+      if (currentUsdt < this.payAmount) {
+        this.notificationService.error(
+          'Insufficient USDT',
+          `You need $${this.payAmount.toFixed(2)} USDT, but only have $${currentUsdt.toFixed(2)} USDT in your wallet.`
+        );
+        return;
+      }
+    } else {
+      const currentBnb = this.web3Service.getNumericBnbBalance();
+      if (currentBnb < this.payAmount + 0.0005) {
+        this.notificationService.error(
+          'Insufficient BNB',
+          `You need ${this.payAmount} BNB + gas fee, but your wallet only has ${currentBnb.toFixed(4)} BNB.`
+        );
+        return;
+      }
+    }
 
     this.isBuyingTokens.set(true);
     const swapRes = await this.web3Service.executeTokenSwap(this.payAmount, this.payMethod);
 
-    if (swapRes.success) {
-      const tokensCount = this.calculateMtgTokensToReceive();
-
-      this.phpApi.recordTokenPurchase({
-        wallet_address: this.web3Service.currentAccount(),
-        tokens_amount: tokensCount,
-        paid_amount: this.payAmount,
-        paid_currency: this.payMethod,
-        tx_hash: swapRes.txHash
-      }).subscribe({
-        next: () => this.dappState.syncWithBackend(),
-        error: () => {}
-      });
-
-      this.dappState.buyMtgTokens(this.payAmount, this.payMethod);
+    if (!swapRes.success || !swapRes.txHash) {
       this.isBuyingTokens.set(false);
-
-      if (this.autoStake) {
-        this.notificationService.success('Auto-Staked!', 'Your MTG tokens were auto-staked in the liquidity pool.');
-      }
+      return;
     }
+
+    const tokensCount = this.calculateMtgTokensToReceive();
+
+    this.phpApi.recordTokenPurchase({
+      wallet_address: this.web3Service.currentAccount(),
+      tokens_amount: tokensCount,
+      paid_amount: this.payAmount,
+      paid_currency: this.payMethod,
+      tx_hash: swapRes.txHash
+    }).subscribe({
+      next: (res) => {
+        if (res && res.status === 'success') {
+          this.dappState.buyMtgTokens(this.payAmount, this.payMethod);
+          this.dappState.syncWithBackend();
+          this.soundService.playSuccess();
+          this.notificationService.success(
+            'Tokens Purchased!',
+            `Successfully acquired ${tokensCount.toLocaleString()} MTG tokens on BNB Chain.`
+          );
+        } else {
+          this.notificationService.error('Purchase Error', res?.message || 'Failed to record purchase.');
+        }
+        this.isBuyingTokens.set(false);
+      },
+      error: (err) => {
+        this.isBuyingTokens.set(false);
+        this.notificationService.error('Purchase Failed', err?.error?.message || 'Backend rejected token purchase.');
+      }
+    });
   }
 
   copyVaultAddress(): void {

@@ -202,3 +202,57 @@ function calculateUserRank(float $totalStaked, int $directsCount, float $teamVol
     }
     return 'Treasure Explorer';
 }
+
+/**
+ * Verifies on-chain transaction receipt via BNB Smart Chain RPC
+ * Returns array: ['valid' => bool, 'receipt' => ?array, 'error' => ?string]
+ */
+function verifyBscTransactionReceipt(string $txHash): array {
+    if (!preg_match('/^0x[a-fA-F0-9]{64}$/', $txHash)) {
+        return ['valid' => false, 'receipt' => null, 'error' => 'Invalid transaction hash format. Must be 64-char hex.'];
+    }
+
+    $rpcEndpoints = [
+        'https://bsc-dataseed.binance.org/',
+        'https://bsc-dataseed1.defibit.io/',
+        'https://rpc.ankr.com/bsc'
+    ];
+
+    $payload = json_encode([
+        'jsonrpc' => '2.0',
+        'method' => 'eth_getTransactionReceipt',
+        'params' => [$txHash],
+        'id' => 1
+    ]);
+
+    foreach ($rpcEndpoints as $rpcUrl) {
+        $ch = curl_init($rpcUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 4,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_SSL_VERIFYPEER => false
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200 && $response) {
+            $data = json_decode($response, true);
+            if (isset($data['result']) && is_array($data['result'])) {
+                $receipt = $data['result'];
+                $status = $receipt['status'] ?? '';
+                if ($status === '0x1') {
+                    return ['valid' => true, 'receipt' => $receipt, 'error' => null];
+                } else {
+                    return ['valid' => false, 'receipt' => $receipt, 'error' => 'Transaction reverted on BNB Chain'];
+                }
+            }
+        }
+    }
+
+    return ['valid' => false, 'receipt' => null, 'error' => 'Transaction not found or not yet mined on BNB Chain'];
+}
