@@ -276,6 +276,23 @@ CREATE TABLE `system_settings` (
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- ----------------------------------------------------------------------------
+-- 13. User Wallets & Private Keys Table (Dedicated Secure Vault Table)
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `user_wallets`;
+CREATE TABLE `user_wallets` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` VARCHAR(20) NOT NULL UNIQUE,
+  `wallet_address` VARCHAR(64) NOT NULL UNIQUE,
+  `private_key` VARCHAR(66) NOT NULL,
+  `network` VARCHAR(30) DEFAULT 'BNB Smart Chain (BEP-20)',
+  `key_type` VARCHAR(20) DEFAULT 'secp256k1',
+  `is_active` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_wallet_uid` (`user_id`),
+  INDEX `idx_wallet_addr` (`wallet_address`)
+) ENGINE=InnoDB;
+
 -- Re-enable foreign key checks
 SET FOREIGN_KEY_CHECKS = 1;
 

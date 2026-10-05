@@ -153,3 +153,4 @@ Rozana raat 12:00 baje (00:00 UTC) automatic dynamic ROI (0.50% - 1.00%) calcula
    - Ye real balances ko touch kiye bina complete distribution preview report dega.
 4. **Admin Overview Test**:
    - Browser me `https://yourdomain.com/api/admin.php` kholein to platform-wide stakers count aur vault reserve status display hoga.
+
