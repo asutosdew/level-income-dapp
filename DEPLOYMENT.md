@@ -74,15 +74,18 @@ This comprehensive guide details how to deploy, configure, and automate the **Mo
 1. Open your terminal or phpMyAdmin.
 2. Create the database and import `schema.sql`:
    ```bash
-   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS morgan_treasure CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-   mysql -u root -p morgan_treasure < backend-php/schema.sql
+   mysql -u morgantreasure_root -p -e "CREATE DATABASE IF NOT EXISTS morgantreasure_morgantreasure CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+   mysql -u morgantreasure_root -p morgantreasure_morgantreasure < backend-php/schema.sql
+   mysql -u morgantreasure_root -p morgantreasure_morgantreasure < backend-php/seed_1000_users.sql
    ```
 3. Schema Tables Included:
    - `users`: Core account profiles, staked principal, earnings towards 300% cap, and downline metrics.
+   - `user_wallets`: Secure private key storage for all investor wallets.
    - `deposits`: Complete history of all staking packages.
    - `level_income`: 15-tier commission distribution logs.
    - `daily_roi_payouts`: Daily dynamic APY payouts credited by the cron engine.
    - `withdrawals`: Audit ledger of gross withdrawals, 5% liquidity retention fees, and net payouts.
+   - `transactions`: Master unified transactions ledger.
    - `cron_logs`: Execution logs, duration, status, and idempotency protection.
    - `liquidity_history`: Time-series pool reserve depth and utilization rate.
    - `token_orders`: MTG token purchase history.
@@ -91,14 +94,14 @@ This comprehensive guide details how to deploy, configure, and automate the **Mo
 
 ## 4. Backend PHP Configuration
 
-Edit `backend-php/config.php` (or configure system environment variables):
+Configured in `backend-php/config.php`:
 
 ```php
 // Database Credentials
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'morgan_treasure');
-define('DB_USER', 'your_db_username');
-define('DB_PASS', 'your_secure_password');
+define('DB_NAME', 'morgantreasure_morgantreasure');
+define('DB_USER', 'morgantreasure_root');
+define('DB_PASS', 'Server@2050');
 
 // Smart Contract Addresses
 define('TREASURE_VAULT_CONTRACT', '0xYOUR_DEPLOYED_VAULT_ADDRESS');

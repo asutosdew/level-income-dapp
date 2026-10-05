@@ -4,8 +4,8 @@
 -- Complete MLM Genealogy, Staking Deposits, 300% Capping, Dynamic ROI & Transactions
 -- ============================================================================
 
-CREATE DATABASE IF NOT EXISTS `morgan_treasure` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `morgan_treasure`;
+CREATE DATABASE IF NOT EXISTS `morgantreasure_morgantreasure` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `morgantreasure_morgantreasure`;
 
 -- Disable foreign key checks during schema creation
 SET FOREIGN_KEY_CHECKS = 0;

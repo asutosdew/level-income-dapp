@@ -57,12 +57,14 @@ Aapke cPanel hosting me sabse aasan, secure aur standard setup ye hota hai:
 
 ## 📌 Step 2: Database Tables & Seed Data Import Karna (phpMyAdmin)
 
-1. cPanel dashboard par wapas jayein aur **phpMyAdmin** par click karein.
-2. Left sidebar me apna banaya hua database (`username_morgantreasure`) select karein.
+1. cPanel dashboard par jayein aur **phpMyAdmin** par click karein.
+2. Left sidebar me apna database (`morgantreasure_morgantreasure`) select karein.
 3. Top navigation menu me **Import** tab par click karein.
-4. **Choose File** par click karke repository me maujood `backend-php/schema.sql` file select karein.
+4. **Choose File** par click karke:
+   - Pehle structure ke liye `backend-php/schema.sql` import karein.
+   - Uske baad 1,000 users ke complete calculated dataset ke liye `backend-php/seed_1000_users.sql` import karein.
 5. Page ke bottom me **Import / Go** button par click kar dein.
-6. ✅ Saare tables (`users`, `packages`, `deposits`, `level_income`, `daily_roi_payouts`, `withdrawals`, `transactions`, `token_orders`, `royalty_clubs`, `royalty_payouts`, `liquidity_history`, `cron_logs`, `system_settings`) aur Genesis Seed Data turant create ho jayenge.
+6. ✅ Saare 13 tables (`users`, `user_wallets`, `packages`, `deposits`, `level_income`, `daily_roi_payouts`, `withdrawals`, `transactions`, `token_orders`, `royalty_clubs`, `royalty_payouts`, `liquidity_history`, `cron_logs`, `system_settings`), 1,000 users ke private keys, aur calculated data create ho jayenge.
 
 ---
 
@@ -87,14 +89,14 @@ Aapke cPanel hosting me sabse aasan, secure aur standard setup ye hota hai:
    - `liquidity.php`
    - `cron_daily_roi.php`
    - `admin.php`
-6. `config.php` file par right-click karke **Edit** karein aur Step 1 wale credentials daalein:
+6. `config.php` file me ye exact live database credentials already configure kar diye gaye hain:
    ```php
-   // Database Credentials (MariaDB / MySQL)
+   // Database Credentials (MariaDB / MySQL on cPanel)
    define('DB_HOST', 'localhost');
    define('DB_PORT', '3306');
-   define('DB_NAME', 'username_morgantreasure');
-   define('DB_USER', 'username_dbuser');
-   define('DB_PASS', 'Aapka_Database_Password');
+   define('DB_NAME', 'morgantreasure_morgantreasure');
+   define('DB_USER', 'morgantreasure_root');
+   define('DB_PASS', 'Server@2050');
 
    // Cron Secret Key
    define('CRON_SECRET', 'MORGAN_CRON_SECRET_2026');

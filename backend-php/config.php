@@ -18,12 +18,12 @@ if (php_sapi_name() !== 'cli') {
     }
 }
 
-// Database Credentials (MariaDB / MySQL)
-define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+// Database Credentials (MariaDB / MySQL on cPanel)
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
-define('DB_NAME', getenv('DB_NAME') ?: 'morgan_treasure');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'morgantreasure_morgantreasure');
+define('DB_USER', getenv('DB_USER') ?: 'morgantreasure_root');
+define('DB_PASS', getenv('DB_PASS') ?: 'Server@2050');
 
 // BNB Smart Chain Details (Hybrid Token Display & Verification)
 define('BSC_RPC_URL', getenv('BSC_RPC_URL') ?: 'https://bsc-dataseed.binance.org/');

@@ -48,21 +48,26 @@ In this Hybrid model:
 
 ## 🗄️ Database Setup (MariaDB / MySQL)
 
-### 1. Create Database and Import Schema
-Run the following in your MariaDB / MySQL terminal or via phpMyAdmin:
+### 1. Database Setup & Import
+Database details configured on your server:
+- **Database Name**: `morgantreasure_morgantreasure`
+- **Username**: `morgantreasure_root`
+- **Password**: `Server@2050`
+
+Import command via terminal or phpMyAdmin:
 ```bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS morgan_treasure DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p morgan_treasure < schema.sql
+mysql -u morgantreasure_root -p morgantreasure_morgantreasure < schema.sql
+mysql -u morgantreasure_root -p morgantreasure_morgantreasure < seed_1000_users.sql
 ```
 
-### 2. Configure Credentials
-Edit `config.php` or set environment variables:
+### 2. Live Credentials in `config.php`
+`config.php` is pre-configured with:
 ```php
-define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
-define('DB_NAME', getenv('DB_NAME') ?: 'morgan_treasure');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'morgantreasure_morgantreasure');
+define('DB_USER', getenv('DB_USER') ?: 'morgantreasure_root');
+define('DB_PASS', getenv('DB_PASS') ?: 'Server@2050');
 ```
 
 ---

@@ -1,10 +1,10 @@
 -- ============================================================================
 -- Morgan Treasure - 1,000 Users Production Seed Dataset with Private Keys & Calculations
 -- Generated for MariaDB / MySQL 8.0+
--- Database: morgan_treasure
+-- Database: morgantreasure_morgantreasure
 -- ============================================================================
 
-USE `morgan_treasure`;
+USE `morgantreasure_morgantreasure`;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- Clean existing data
