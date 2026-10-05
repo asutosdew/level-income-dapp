@@ -27,8 +27,8 @@ import { DappStateService } from '../../services/dapp-state.service';
       <!-- Top Sticky Web3 Header -->
       <app-header></app-header>
 
-      <!-- Live Blockchain Activity Ticker -->
-      <app-live-ticker></app-live-ticker>
+      <!-- Live Blockchain Activity Ticker (Hidden when unauthenticated) -->
+      <app-live-ticker *ngIf="dappState.user().isRegistered"></app-live-ticker>
 
       <!-- Main Content Container with Generous Margins & Breathing Room -->
       <main class="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex-1 pb-32 md:pb-16 space-y-8 sm:space-y-10">
@@ -78,8 +78,8 @@ import { DappStateService } from '../../services/dapp-state.service';
         </footer>
       </main>
 
-      <!-- Bottom Dock Bar (Mobile Web3 In-App Wallet Experience, hidden on desktop) -->
-      <div class="block md:hidden">
+      <!-- Bottom Dock Bar (Mobile Web3 In-App Wallet Experience, only for registered users) -->
+      <div class="block md:hidden" *ngIf="dappState.user().isRegistered">
         <app-bottom-nav></app-bottom-nav>
       </div>
 

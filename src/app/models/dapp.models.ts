@@ -136,6 +136,7 @@ export interface UserProfile {
   totalEarningTowardsCapUsdt: number;
   lastRoiClaimTimestamp: number;
   isRegistered: boolean;
+  nickname?: string;
 }
 
 export interface LiveActivityItem {

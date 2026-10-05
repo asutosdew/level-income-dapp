@@ -14,34 +14,8 @@ if (empty($address) || !preg_match('/^0x[a-f0-9]{40}$/', $address)) {
 
 $pdo = getDbConnection();
 
-// Fallback simulated response if DB connection is unavailable
 if (!$pdo) {
-    sendResponse('success', 'User profile retrieved (Simulated Demo)', [
-        'address' => $address,
-        'userId' => 'MT-77291',
-        'sponsorId' => 'MT-10024',
-        'sponsorAddress' => '0x9b32fa99834190cbbde029104fa2841b994801ac',
-        'referralCode' => 'MT77291',
-        'activePackageId' => 'gold_500',
-        'activePackageName' => 'Morgan Gold ($500)',
-        'totalStakedUsdt' => 500,
-        'availableBalanceUsdt' => 218.40,
-        'totalWithdrawnUsdt' => 320.00,
-        'totalLevelIncomeUsdt' => 520.40,
-        'totalDirectIncomeUsdt' => 250.00,
-        'totalRoiIncomeUsdt' => 184.80,
-        'totalRoyaltyIncomeUsdt' => 95.00,
-        'rank' => 'Gold Treasure Leader',
-        'directsCount' => 9,
-        'activeDirectsCount' => 7,
-        'totalTeamCount' => 156,
-        'totalTeamTurnoverUsdt' => 24500,
-        'strongLegVolumeUsdt' => 14800,
-        'otherLegsVolumeUsdt' => 9700,
-        'maxCappingLimitUsdt' => 1500,
-        'totalEarningTowardsCapUsdt' => 1050.20,
-        'isRegistered' => true
-    ]);
+    sendResponse('error', 'Database connection failed. Unable to load profile.', null, 500);
 }
 
 try {

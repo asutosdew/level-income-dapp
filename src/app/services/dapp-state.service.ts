@@ -532,25 +532,34 @@ export class DappStateService {
     return true;
   }
 
-  // Register User with Sponsor ID
-  registerUser(sponsorId: string, customNickname?: string): boolean {
+  // Register User with Sponsor ID (MariaDB Backend Data)
+  registerUser(sponsorOrData: any, customNickname?: string): boolean {
     this.soundService.playTap();
     const currentUser = this.user();
-    const cleanSponsor = sponsorId ? sponsorId.trim() : 'MT-10024';
 
-    this.user.set({
-      ...currentUser,
-      sponsorId: cleanSponsor,
-      userId: 'MT-' + Math.floor(10000 + Math.random() * 90000),
-      isRegistered: true,
-      rank: 'Morgan Bronze Explorer'
-    });
+    if (typeof sponsorOrData === 'object' && sponsorOrData !== null) {
+      this.user.set({
+        ...currentUser,
+        userId: sponsorOrData.userId || currentUser.userId,
+        sponsorId: sponsorOrData.sponsorId || currentUser.sponsorId,
+        sponsorAddress: sponsorOrData.sponsorAddress || currentUser.sponsorAddress,
+        nickname: sponsorOrData.nickname || customNickname || currentUser.nickname,
+        referralCode: sponsorOrData.referralCode || currentUser.referralCode,
+        isRegistered: true,
+        rank: sponsorOrData.rank || 'Treasure Explorer'
+      });
+    } else {
+      const cleanSponsor = sponsorOrData ? sponsorOrData.toString().trim() : 'MT-10024';
+      this.user.set({
+        ...currentUser,
+        sponsorId: cleanSponsor,
+        nickname: customNickname || currentUser.nickname,
+        isRegistered: true,
+        rank: 'Treasure Explorer'
+      });
+    }
 
     this.soundService.playSuccess();
-    this.notificationService.success(
-      'Registration Confirmed!',
-      `Welcome to Morgan Treasure. Your account is linked to Sponsor ${cleanSponsor}.`
-    );
     return true;
   }
 

@@ -82,22 +82,35 @@ export class PhpApiService {
       );
   }
 
+  // 1b. Verify Sponsor ID existence in MariaDB
+  verifySponsor(sponsorId: string): Observable<{ valid: boolean; sponsor?: any; message?: string }> {
+    if (!sponsorId || !sponsorId.trim()) {
+      return of({ valid: false, message: 'Please enter a Sponsor ID' });
+    }
+    return this.http.get<ApiResponse>(`${this.apiBaseUrl()}/register.php?check_sponsor=${encodeURIComponent(sponsorId.trim())}`)
+      .pipe(
+        map(res => {
+          if (res && res.status === 'success') {
+            return { valid: true, sponsor: res.data, message: 'Valid Sponsor' };
+          }
+          return { valid: false, message: res?.message || 'Invalid Sponsor ID' };
+        }),
+        catchError(err => {
+          const msg = err?.error?.message || 'Sponsor ID not found in system';
+          return of({ valid: false, message: msg });
+        })
+      );
+  }
+
   // 2. Register Account with Sponsor ID in MariaDB
   register(payload: { wallet_address: string; sponsor_id: string; nickname?: string }): Observable<ApiResponse> {
     return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/register.php`, payload, this.httpOptions)
       .pipe(
         catchError(err => {
-          console.warn('PHP API /register.php offline, falling back to local registration:', err);
-          const simulatedUserId = 'MT-' + Math.floor(10000 + Math.random() * 90000);
+          const errMsg = err?.error?.message || err?.message || 'Registration failed. Please verify Sponsor ID and try again.';
           return of({
-            status: 'success',
-            message: 'Registered in local session (PHP backend offline)',
-            data: {
-              userId: simulatedUserId,
-              sponsorId: payload.sponsor_id || 'MT-10024',
-              wallet_address: payload.wallet_address,
-              referralCode: simulatedUserId.replace('-', '')
-            }
+            status: 'error',
+            message: errMsg
           } as ApiResponse);
         })
       );
@@ -109,7 +122,7 @@ export class PhpApiService {
       .pipe(
         map(res => res.data || null),
         catchError(err => {
-          console.warn('PHP API /dashboard.php offline, using local state:', err);
+          console.warn('PHP API /dashboard.php offline or error:', err);
           return of(null);
         })
       );
@@ -125,11 +138,10 @@ export class PhpApiService {
     return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/deposit.php`, payload, this.httpOptions)
       .pipe(
         catchError(err => {
-          console.warn('PHP API /deposit.php offline, deposit stored locally:', err);
+          const errMsg = err?.error?.message || err?.message || 'Failed to record deposit on server.';
           return of({
-            status: 'success',
-            message: 'Deposit confirmed in local state (PHP offline)',
-            data: payload
+            status: 'error',
+            message: errMsg
           } as ApiResponse);
         })
       );

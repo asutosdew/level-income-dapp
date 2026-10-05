@@ -6,16 +6,21 @@ import { WithdrawOptionComponent } from './pages/withdraw-option/withdraw-option
 import { TeamComponent } from './pages/team/team.component';
 import { SmartContractComponent } from './pages/smart-contract/smart-contract.component';
 import { ConnectRegisterComponent } from './pages/connect-register/connect-register.component';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  
-  { path: 'dashboard', component: DashboardComponent },
-  { path: 'deposit', component: DepositFundComponent },
-  { path: 'income', component: IncomeDetailComponent },
-  { path: 'team', component: TeamComponent },
+  // Public Bootstrap Gateway: Connect Wallet & Register with Sponsor ID
   { path: 'connect', component: ConnectRegisterComponent },
-  { path: 'withdraw', component: WithdrawOptionComponent },
-  { path: 'contract', component: SmartContractComponent },
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-  { path: '**', redirectTo: 'dashboard' }
+
+  // Protected Protocol Pages: Require Connected Wallet & MariaDB Registered Account
+  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'deposit', component: DepositFundComponent, canActivate: [authGuard] },
+  { path: 'income', component: IncomeDetailComponent, canActivate: [authGuard] },
+  { path: 'team', component: TeamComponent, canActivate: [authGuard] },
+  { path: 'withdraw', component: WithdrawOptionComponent, canActivate: [authGuard] },
+  { path: 'contract', component: SmartContractComponent, canActivate: [authGuard] },
+
+  // Default Entry Point: Always bootstrap to Connect / Register gateway
+  { path: '', redirectTo: 'connect', pathMatch: 'full' },
+  { path: '**', redirectTo: 'connect' }
 ];

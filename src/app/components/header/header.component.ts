@@ -22,12 +22,12 @@ import { MorganTreasureLogoComponent } from '../logo/morgan-treasure-logo.compon
         <div class="py-2.5 sm:py-3 flex items-center justify-between gap-3 border-b md:border-b-0 border-slate-800/70">
           
           <!-- Left: Brand Logo with Full Wordmark (MORGAN TREASURE) -->
-          <a routerLink="/dashboard" class="flex items-center gap-2 group shrink-0 cursor-pointer">
+          <a [routerLink]="dappState.user().isRegistered ? '/dashboard' : '/connect'" class="flex items-center gap-2 group shrink-0 cursor-pointer">
             <app-morgan-treasure-logo size="sm" [showTagline]="false"></app-morgan-treasure-logo>
           </a>
 
-          <!-- Center: Desktop Navigation Tabs (Hidden on Mobile) -->
-          <nav class="hidden md:flex items-center gap-1 bg-slate-900/80 p-1 rounded-2xl border border-slate-800/80 font-sans text-xs">
+          <!-- Center: Desktop Navigation Tabs (Hidden if not registered or on Mobile) -->
+          <nav *ngIf="dappState.user().isRegistered" class="hidden md:flex items-center gap-1 bg-slate-900/80 p-1 rounded-2xl border border-slate-800/80 font-sans text-xs">
             <a
               routerLink="/dashboard"
               routerLinkActive="bg-amber-500/15 text-amber-300 font-bold border-amber-500/30"
