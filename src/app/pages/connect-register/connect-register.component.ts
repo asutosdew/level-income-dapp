@@ -319,12 +319,18 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
           <form (ngSubmit)="handleRegister()" class="space-y-4 pt-1">
             <div class="space-y-1.5">
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold text-slate-300 font-mono">
-                  STEP 2: SPONSOR REFERRAL ID <span class="text-red-400 font-black">*</span>
+                <label class="text-xs font-bold text-slate-300 font-mono flex items-center gap-1.5">
+                  <span>STEP 2: SPONSOR REFERRAL ID</span>
+                  <span class="text-red-400 font-black">*</span>
                 </label>
-                <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
-                  Compulsory
-                </span>
+                <div class="flex items-center gap-1.5">
+                  <span *ngIf="isSponsorLocked()" class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-lock text-[9px]"></i> Locked Referral
+                  </span>
+                  <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+                    Compulsory
+                  </span>
+                </div>
               </div>
               
               <div class="relative">
@@ -335,14 +341,25 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
                   (blur)="verifySponsorLive()"
                   name="sponsorId"
                   placeholder="Enter Sponsor ID (e.g. MT-10024)"
+                  [readonly]="isSponsorLocked()"
                   required
-                  class="w-full p-3.5 pl-10 pr-24 rounded-xl bg-slate-950/90 border text-white font-mono text-sm transition-all focus:outline-none focus:ring-1"
-                  [ngClass]="sponsorCheckStatus() === 'valid' ? 'border-emerald-500/80 focus:border-emerald-500 focus:ring-emerald-500' : (sponsorCheckStatus() === 'invalid' ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : 'border-slate-800 focus:border-amber-500 focus:ring-amber-500')"
+                  class="w-full p-3.5 pl-10 pr-28 rounded-xl font-mono text-sm transition-all focus:outline-none focus:ring-1"
+                  [ngClass]="[
+                    isSponsorLocked() ? 'bg-slate-900/90 text-amber-300 cursor-not-allowed border-amber-500/50' : 'bg-slate-950/90 text-white',
+                    sponsorCheckStatus() === 'valid' ? 'border-emerald-500/80 focus:border-emerald-500 focus:ring-emerald-500' : (sponsorCheckStatus() === 'invalid' ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : 'border-slate-800 focus:border-amber-500 focus:ring-amber-500')
+                  ]"
                 />
-                <i class="fa-solid fa-user-check absolute left-3.5 top-4 text-slate-500 text-xs"></i>
+                <i class="absolute left-3.5 top-4 text-xs" [ngClass]="isSponsorLocked() ? 'fa-solid fa-lock text-amber-400' : 'fa-solid fa-user-check text-slate-500'"></i>
                 
-                <!-- Quick Verify / Default Button -->
+                <!-- If locked from invite link -->
+                <div *ngIf="isSponsorLocked()" class="absolute right-2 top-2 px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-mono font-bold border border-amber-500/30 flex items-center gap-1">
+                  <i class="fa-solid fa-lock text-[10px]"></i>
+                  <span>Invite Link</span>
+                </div>
+
+                <!-- If not locked, show live verify button -->
                 <button
+                  *ngIf="!isSponsorLocked()"
                   type="button"
                   (click)="verifySponsorLive()"
                   [disabled]="isVerifyingSponsor()"
@@ -359,7 +376,10 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
                   <i class="fa-solid fa-circle-check"></i>
                   <span>Sponsor: <strong>{{ verifiedSponsorName() }}</strong></span>
                 </span>
-                <span class="text-emerald-300 font-bold">{{ verifiedSponsorId() }}</span>
+                <span class="text-emerald-300 font-bold flex items-center gap-1">
+                  <i *ngIf="isSponsorLocked()" class="fa-solid fa-lock text-[10px]"></i>
+                  <span>{{ verifiedSponsorId() }}</span>
+                </span>
               </div>
 
               <div *ngIf="sponsorCheckStatus() === 'invalid'" class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono flex items-center gap-1.5">
@@ -367,7 +387,11 @@ import { MorganTreasureLogoComponent } from '../../components/logo/morgan-treasu
                 <span>{{ sponsorErrorMessage() || 'Sponsor ID not found in database. Sponsor ID is compulsory.' }}</span>
               </div>
 
-              <p class="text-[11px] text-slate-500 font-mono">
+              <p *ngIf="isSponsorLocked()" class="text-[11px] text-amber-400/90 font-mono flex items-center gap-1">
+                <i class="fa-solid fa-shield-halved text-[10px]"></i>
+                <span>Joined via official invite link. Sponsor cannot be changed.</span>
+              </p>
+              <p *ngIf="!isSponsorLocked()" class="text-[11px] text-slate-500 font-mono">
                 Must be an active investor in Morgan Treasure. If you don't have one, ask your inviter or team leader.
               </p>
             </div>
@@ -455,6 +479,7 @@ export class ConnectRegisterComponent implements OnInit {
   public verifiedSponsorId = signal<string>('');
   public sponsorErrorMessage = signal<string>('');
   public unregisteredWarning = signal<string>('');
+  public isSponsorLocked = signal<boolean>(false);
 
   private debounceTimer: any = null;
 
@@ -471,14 +496,23 @@ export class ConnectRegisterComponent implements OnInit {
   ngOnInit(): void {
     // Check if referral link or mode parameter was supplied
     this.route.queryParams.subscribe(params => {
-      if (params['ref']) {
-        this.sponsorId = params['ref'].trim().toUpperCase();
+      const ref = (params['ref'] || params['sponsor'] || params['s'] || '').trim().toUpperCase();
+      if (ref) {
+        this.sponsorId = ref;
+        this.isSponsorLocked.set(true);
         this.mode.set('register');
         this.verifySponsorLive();
+        this.notificationService.info(
+          'Referral Link Detected',
+          `Sponsor ${this.sponsorId} pre-filled and locked from invite link.`
+        );
+      } else {
+        this.isSponsorLocked.set(false);
       }
-      if (params['mode'] === 'register') {
+
+      if (params['mode'] === 'register' && !ref) {
         this.mode.set('register');
-      } else if (params['mode'] === 'login') {
+      } else if (params['mode'] === 'login' && !ref) {
         this.mode.set('login');
       }
     });
@@ -552,6 +586,8 @@ export class ConnectRegisterComponent implements OnInit {
 
   // Real-time Sponsor ID Validation
   onSponsorInputChange(): void {
+    if (this.isSponsorLocked()) return; // Locked: prevent changes when joined from invite link
+
     this.sponsorCheckStatus.set('idle');
     this.sponsorErrorMessage.set('');
 
