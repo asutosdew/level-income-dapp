@@ -10,6 +10,7 @@ $pdo = getDbConnection();
 
 $checkSponsor = '';
 
+// Support both GET and POST methods
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $checkSponsor = trim($_GET['check_sponsor'] ?? $_GET['sponsor_id'] ?? '');
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {

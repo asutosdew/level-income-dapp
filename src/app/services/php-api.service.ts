@@ -82,7 +82,7 @@ export class PhpApiService {
       );
   }
 
-  // 1b. Verify Sponsor ID existence in MariaDB (POST request)
+  // 1b. Verify Sponsor ID existence in MariaDB (POST request with dual endpoint support)
   verifySponsor(sponsorId: string): Observable<{ valid: boolean; sponsor?: any; message?: string }> {
     if (!sponsorId || !sponsorId.trim()) {
       return of({ valid: false, message: 'Please enter a Sponsor ID' });
@@ -93,7 +93,9 @@ export class PhpApiService {
       sponsor_id: cleanSponsor,
       check_sponsor: cleanSponsor
     };
-    return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/register.php`, payload, this.httpOptions)
+
+    // Try verify_sponsor.php first, fallback to register.php if 404
+    return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/verify_sponsor.php`, payload, this.httpOptions)
       .pipe(
         map(res => {
           if (res && res.status === 'success') {
@@ -102,8 +104,20 @@ export class PhpApiService {
           return { valid: false, message: res?.message || 'Invalid Sponsor ID' };
         }),
         catchError(err => {
-          const msg = err?.error?.message || 'Sponsor ID not found in system';
-          return of({ valid: false, message: msg });
+          // Fallback to register.php
+          return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/register.php`, payload, this.httpOptions)
+            .pipe(
+              map(res => {
+                if (res && res.status === 'success') {
+                  return { valid: true, sponsor: res.data, message: 'Valid Sponsor' };
+                }
+                return { valid: false, message: res?.message || 'Invalid Sponsor ID' };
+              }),
+              catchError(regErr => {
+                const msg = regErr?.error?.message || err?.error?.message || 'Sponsor ID not found in system';
+                return of({ valid: false, message: msg });
+              })
+            );
         })
       );
   }
