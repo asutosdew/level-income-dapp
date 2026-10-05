@@ -82,12 +82,18 @@ export class PhpApiService {
       );
   }
 
-  // 1b. Verify Sponsor ID existence in MariaDB
+  // 1b. Verify Sponsor ID existence in MariaDB (POST request)
   verifySponsor(sponsorId: string): Observable<{ valid: boolean; sponsor?: any; message?: string }> {
     if (!sponsorId || !sponsorId.trim()) {
       return of({ valid: false, message: 'Please enter a Sponsor ID' });
     }
-    return this.http.get<ApiResponse>(`${this.apiBaseUrl()}/register.php?check_sponsor=${encodeURIComponent(sponsorId.trim())}`)
+    const cleanSponsor = sponsorId.trim().toUpperCase();
+    const payload = {
+      action: 'verify_sponsor',
+      sponsor_id: cleanSponsor,
+      check_sponsor: cleanSponsor
+    };
+    return this.http.post<ApiResponse>(`${this.apiBaseUrl()}/register.php`, payload, this.httpOptions)
       .pipe(
         map(res => {
           if (res && res.status === 'success') {

@@ -8,13 +8,20 @@ require_once __DIR__ . '/config.php';
 
 $pdo = getDbConnection();
 
-// 1. Live Sponsor Validation Endpoint (GET ?check_sponsor=MT-10024)
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $checkSponsor = trim($_GET['check_sponsor'] ?? '');
-    if (empty($checkSponsor)) {
-        sendResponse('error', 'check_sponsor parameter is required', null, 400);
-    }
+$checkSponsor = '';
 
+// Support sponsor verification via both GET and POST
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['check_sponsor'])) {
+    $checkSponsor = trim($_GET['check_sponsor']);
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $payload = getJsonPayload();
+    if ((isset($payload['action']) && $payload['action'] === 'verify_sponsor') || isset($payload['check_sponsor'])) {
+        $checkSponsor = trim($payload['sponsor_id'] ?? $payload['check_sponsor'] ?? '');
+    }
+}
+
+// 1. Live Sponsor Validation (GET ?check_sponsor=... or POST { action: "verify_sponsor", sponsor_id: "..." })
+if (!empty($checkSponsor)) {
     if (!$pdo) {
         sendResponse('error', 'Database connection unavailable', null, 500);
     }
@@ -42,21 +49,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 }
 
+// 2. Full Account Registration requires POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sendResponse('error', 'Only GET (check_sponsor) and POST requests allowed', null, 405);
+    sendResponse('error', 'Only POST requests allowed', null, 405);
 }
 
-$payload = getJsonPayload();
+if (!isset($payload)) {
+    $payload = getJsonPayload();
+}
+
 $wallet = strtolower(trim($payload['wallet_address'] ?? ''));
 $sponsorId = trim($payload['sponsor_id'] ?? '');
 $nickname = trim($payload['nickname'] ?? '');
 
-// 2. Validate BEP-20 Wallet Address
+// 3. Validate BEP-20 Wallet Address
 if (empty($wallet) || !preg_match('/^0x[a-f0-9]{40}$/', $wallet)) {
     sendResponse('error', 'Valid BNB Chain (BEP-20) wallet address is required', null, 422);
 }
 
-// 3. Strict Sponsor ID Requirement (COMPULSORY)
+// 4. Strict Sponsor ID Requirement (COMPULSORY)
 if (empty($sponsorId)) {
     sendResponse('error', 'Sponsor ID is mandatory for new registration. Please enter a valid Sponsor ID.', null, 422);
 }
@@ -66,7 +77,7 @@ if (!$pdo) {
 }
 
 try {
-    // 4. Check if wallet is already registered
+    // 5. Check if wallet is already registered
     $stmt = $pdo->prepare("SELECT * FROM users WHERE wallet_address = ?");
     $stmt->execute([$wallet]);
     $existing = $stmt->fetch();
@@ -83,7 +94,7 @@ try {
         ]);
     }
 
-    // 5. Verify Sponsor exists strictly in MariaDB
+    // 6. Verify Sponsor exists strictly in MariaDB
     $cleanSponsor = str_replace('-', '', strtoupper($sponsorId));
     $sponsorStmt = $pdo->prepare("
         SELECT wallet_address, user_id, nickname 
@@ -106,7 +117,7 @@ try {
     $finalSponsorId = $sponsor['user_id'];
     $sponsorAddress = $sponsor['wallet_address'];
 
-    // 6. Generate unique random User ID (e.g. MT-77291)
+    // 7. Generate unique random User ID (e.g. MT-77291)
     do {
         $userId = 'MT-' . rand(10000, 99999);
         $checkId = $pdo->prepare("SELECT id FROM users WHERE user_id = ?");
@@ -117,7 +128,7 @@ try {
 
     $pdo->beginTransaction();
 
-    // 7. Insert new user into MariaDB
+    // 8. Insert new user into MariaDB
     $insert = $pdo->prepare("
         INSERT INTO users (
             wallet_address, user_id, sponsor_id, sponsor_address, 
@@ -126,7 +137,7 @@ try {
     ");
     $insert->execute([$wallet, $userId, $finalSponsorId, $sponsorAddress, $displayName]);
 
-    // 8. Update direct sponsor statistics
+    // 9. Update direct sponsor statistics
     $updSponsor = $pdo->prepare("
         UPDATE users 
         SET directs_count = directs_count + 1, 
