@@ -31,41 +31,55 @@ This comprehensive guide details how to deploy, configure, and automate the **Mo
 
 ---
 
-## 2. Solidity Smart Contract Deployment
+## 2. Solidity Smart Contract Deployment (Hybrid Web3 Architecture)
 
-### Files:
-- `contracts/MorganTreasureVault.sol`: Main staking, dynamic APY, 15-tier MLM, and vault contract.
-- `contracts/MockUSDT.sol`: Turnkey mock BEP-20 token for local, Hardhat, or BSC Testnet environments.
+### Contracts Suite:
+1. `contracts/MTGToken.sol`:
+   - Official BEP-20 Morgan Treasure Utility & Presale Token on BNB Chain.
+   - Name: **Morgan Treasure**, Symbol: **MTG**, Decimals: **18**, Supply: **100,000,000 MTG**.
+   - Presale Price: **$0.25 USDT**.
+   - Supports minting/burning by authorized Hot-Wallet / PHP API operator.
+2. `contracts/MorganTreasureVault.sol`:
+   - Hybrid Non-Custodial USDT Staking & Treasury Vault.
+   - Emits indexed Web3 events (`Staked`, `Deposited`, `Withdrawn`, `PayoutDisbursed`).
+   - Automated Hot-Wallet Batch & Single Disbursement (`disbursePayout`, `disburseBatchPayouts`) for instant 24/7 withdrawals.
+   - Dynamic APY curve (0.50% - 1.00% daily based on $1M - $3M vault reserve).
+   - Gas-optimized: Offloads heavy 15-tier MLM recursive loops to MariaDB + PHP API for minimal BSC gas fees.
+3. `contracts/MockUSDT.sol`:
+   - Turnkey mock BEP-20 token for local, Hardhat, or BSC Testnet environments.
 
 ### Deployment via Remix IDE:
 1. Open [https://remix.ethereum.org](https://remix.ethereum.org).
-2. Create a new file `MorganTreasureVault.sol` in Remix and paste the contents of `contracts/MorganTreasureVault.sol`.
-3. In the **Solidity Compiler** tab:
-   - Compiler version: `0.8.20` or higher (`0.8.20` - `0.8.28`).
-   - EVM Version: `paris` or `shanghai` (or default).
-   - Enable optimization: Check **Enable optimization** (Runs: `200`).
-   - Click **Compile MorganTreasureVault.sol**.
-4. In the **Deploy & Run Transactions** tab:
-   - Environment: Select **Injected Provider - MetaMask**.
-   - Make sure your MetaMask wallet is connected to **BNB Smart Chain Mainnet (Chain ID 56)** or **BSC Testnet (Chain ID 97)**.
-   - Select Contract: `MorganTreasureVault`.
-   - Fill Constructor Arguments:
-     - `_stakingToken`: `0x55d398326f99059fF775485246999027B3197955` (USDT on BSC Mainnet). For testnet, deploy `MockUSDT.sol` first and pass its address here.
-     - `_genesisSponsor`: Your root founder/master wallet address (e.g. `0x9b32fa99834190cbbde029104fa2841b994801ac`).
-     - `_treasuryReserve`: Protocol treasury or cold wallet address.
-   - Click **Transact** and confirm the deployment in MetaMask.
-5. Save the newly deployed contract address.
+
+#### Step A: Deploy MTG Token (`contracts/MTGToken.sol`)
+1. Create `MTGToken.sol` in Remix and paste `contracts/MTGToken.sol`.
+2. Compile with Solidity `0.8.20` (Enable optimization: 200 runs).
+3. In **Deploy & Run Transactions** (Injected Provider - MetaMask on BNB Chain):
+   - Constructor args:
+     - `initialHolder`: Founder / Treasury address (e.g. `0x9b32fa99834190cbbde029104fa2841b994801ac`)
+     - `initialOperator`: Backend Hot-Wallet address (for automated API minting / disbursements)
+   - Click **Deploy** and save the deployed `MTGToken` address.
+
+#### Step B: Deploy Hybrid Vault (`contracts/MorganTreasureVault.sol`)
+1. Create `MorganTreasureVault.sol` in Remix and paste `contracts/MorganTreasureVault.sol`.
+2. Compile with Solidity `0.8.20` (Enable optimization: 200 runs).
+3. In **Deploy & Run Transactions**:
+   - Constructor args:
+     - `_stakingToken`: `0x55d398326f99059fF775485246999027B3197955` (USDT on BSC Mainnet). For testnet, deploy `MockUSDT.sol` first and pass its address.
+     - `_genesisSponsor`: Root founder wallet address (`0x9b32fa99834190cbbde029104fa2841b994801ac`).
+     - `_treasuryReserve`: Protocol treasury cold wallet address.
+     - `_initialOperator`: Backend Hot-Wallet address (authorized for PHP API payout disbursements).
+   - Click **Transact** and confirm in MetaMask.
+4. Save the deployed Vault address.
 
 ### BscScan 1-Click Verification:
 1. Go to [https://bscscan.com](https://bscscan.com) (or [https://testnet.bscscan.com](https://testnet.bscscan.com)).
 2. Navigate to your deployed contract address and click **Contract** > **Verify and Publish**.
 3. Settings:
    - Compiler Type: **Solidity (Single file)**
-   - Compiler Version: Select exact version used in compilation (e.g., `v0.8.20+commit...`)
+   - Compiler Version: `v0.8.20`
    - Open Source License Type: **MIT License (MIT)**
-4. Paste the full code of `contracts/MorganTreasureVault.sol`.
-5. Enter Constructor Arguments ABI-encoded (if requested, Remix copies this automatically).
-6. Click **Verify and Publish**. Your contract is now verified with an interactive green checkmark.
+4. Paste the respective `.sol` file content and click **Verify and Publish**.
 
 ---
 

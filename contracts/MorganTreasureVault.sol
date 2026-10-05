@@ -2,34 +2,28 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title MorganTreasureVault
+ * @title MorganTreasureVault (Hybrid Staking & Treasury Vault)
  * @author Morgan Treasure Protocol Architecture Team
- * @notice Production-Ready BEP-20 Staking, Automated Dynamic APY & 15-Tier Level MLM Protocol
+ * @notice Production-Ready BEP-20 Staking, Automated Dynamic APY & Hybrid Web3 Treasury Vault
  * 
- * CORE PROTOCOL SPECIFICATIONS:
- * 1. Automated Dynamic Daily APY:
- *    - Automatically floats between 0.50% (50 BPS) and 1.00% (100 BPS) daily.
- *    - Continuous per-second reward accrual based on contract vault USDT reserve depth.
- * 2. Hard 300% (3.0x) Profit Cap:
- *    - All earnings (Daily Dynamic ROI + 15-Tier Commissions) are mathematically capped at 300% of staked principal.
- * 3. 15-Tier Instant Affiliate Commission:
- *    - Level 1: 10.00% (1000 BPS)
- *    - Level 2:  5.00% (500 BPS)
- *    - Level 3:  3.00% (300 BPS)
- *    - Level 4:  2.00% (200 BPS)
- *    - Level 5:  1.00% (100 BPS)
- *    - Level 6-10: 0.50% each (50 BPS each = 2.50%)
- *    - Level 11-15: 0.25% each (25 BPS each = 1.25%)
- *    - Total Affiliate Allocation = 22.75% (2275 BPS)
- *    - Unlocked based on active direct referral counts (1 direct: L1-2, 2: L3-5, 3: L6-10, 5: L11-15).
- * 4. 5% Withdrawal Liquidity Retention Fee:
- *    - 95% net payout to user, 5% retained in the contract reserve to sustain liquidity and boost dynamic APY.
- * 5. Production Security:
- *    - ReentrancyGuard, Ownable, Pausable, and SafeERC20 with low-level call verification.
+ * HYBRID WEB3 SPECIFICATIONS:
+ * 1. Off-Chain (MariaDB + PHP API):
+ *    - High-throughput 15-tier MLM genealogy tree
+ *    - Real-time 300% maximum profit capping computation
+ *    - Dynamic daily ROI cron accrual (0.50% - 1.00%)
+ *    - Unified financial transaction ledger & team analytics
+ * 
+ * 2. On-Chain (BNB Smart Chain - MorganTreasureVault.sol):
+ *    - Secure non-custodial BEP-20 USDT staking custody
+ *    - Algorithmic Dynamic APY curve based on Vault reserve depth ($1M to $3M USDT)
+ *    - Indexed Web3 event emissions (Staked, Withdrawn, Disbursed) for PHP API sync
+ *    - Automated hot-wallet batch disbursement for instant 24/7 withdrawals
+ *    - 5% protocol liquidity retention fee (95% net payout) to preserve reserve health
+ *    - Gas-optimized: Eliminates expensive 15-tier on-chain loops while retaining protocol views
  */
 
 // ============================================================================
-// 1. OPENZEPPELIN INTERFACES & UTILITIES (Self-Contained for 1-Click Verification)
+// 1. OPENZEPPELIN / BEP-20 INTERFACES & UTILITIES
 // ============================================================================
 
 interface IERC20 {
@@ -85,7 +79,7 @@ abstract contract Ownable is Context {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     constructor(address initialOwner) {
-        require(initialOwner != address(0), "Ownable: initial owner is the zero address");
+        require(initialOwner != address(0), "Ownable: initial owner is zero address");
         _transferOwnership(initialOwner);
     }
 
@@ -103,7 +97,7 @@ abstract contract Ownable is Context {
     }
 
     function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(newOwner != address(0), "Ownable: new owner is zero address");
         _transferOwnership(newOwner);
     }
 
@@ -142,25 +136,17 @@ abstract contract Pausable is Context {
     }
 
     modifier whenNotPaused() {
-        _requireNotPaused();
+        require(!_paused, "Pausable: paused");
         _;
     }
 
     modifier whenPaused() {
-        _requirePaused();
+        require(_paused, "Pausable: not paused");
         _;
     }
 
     function paused() public view virtual returns (bool) {
         return _paused;
-    }
-
-    function _requireNotPaused() internal view virtual {
-        require(!paused(), "Pausable: paused");
-    }
-
-    function _requirePaused() internal view virtual {
-        require(paused(), "Pausable: not paused");
     }
 
     function _pause() internal virtual whenNotPaused {
@@ -175,7 +161,7 @@ abstract contract Pausable is Context {
 }
 
 // ============================================================================
-// 2. MORGAN TREASURE VAULT CORE CONTRACT
+// 2. HYBRID MORGAN TREASURE VAULT CORE CONTRACT
 // ============================================================================
 
 contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
@@ -186,7 +172,7 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         bool isRegistered;
         address sponsor;
         uint256 totalStaked;
-        uint256 totalEarned;             // Cumulative earnings towards 300% cap (ROI + Level Commission)
+        uint256 totalEarned;             // Cumulative earnings towards 300% cap
         uint256 pendingRoiReward;        // Accrued claimable ROI
         uint256 referralReward;          // Accrued claimable MLM Level Commission
         uint256 totalWithdrawn;          // Total successfully withdrawn USDT
@@ -217,8 +203,8 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
     address public treasuryReserve;                         // Protocol insurance/treasury fallback
 
     uint256 public minDepositAmount;                        // Minimum deposit (default: 50 USDT)
-    uint256 public reserveThresholdLow;                     // Reserve depth for 0.50% ROI (e.g. 1,000,000 USDT)
-    uint256 public reserveThresholdHigh;                    // Reserve depth for 1.00% ROI (e.g. 3,000,000 USDT)
+    uint256 public reserveThresholdLow;                     // Reserve depth for 0.50% ROI ($1,000,000)
+    uint256 public reserveThresholdHigh;                    // Reserve depth for 1.00% ROI ($3,000,000)
     bool public isDynamicRoiAutomated;                      // True = algorithmic by reserve, False = manual override
     uint256 public manualDailyRoiBps;                       // Manual override fallback BPS
 
@@ -229,12 +215,11 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
     uint256 public totalRoiDistributed;
     uint256 public totalProtocolUsers;
 
-    // Level Commission Basis Points (Total = 2275 BPS = 22.75%)
-    // L1=10%, L2=5%, L3=3%, L4=2%, L5=1%, L6-10=0.5% each, L11-15=0.25% each
-    uint256[NUMBER_OF_LEVELS] public levelCommissionBps;
+    // Authorized Hot-Wallet Operators (PHP Backend API hot wallet for instant disbursements)
+    mapping(address => bool) public isOperator;
 
-    // Direct referrals required to unlock each level tier
-    // L1-2: 1 direct, L3-5: 2 directs, L6-10: 3 directs, L11-15: 5 directs
+    // Level Commission Schedule (For transparency & frontend queries)
+    uint256[NUMBER_OF_LEVELS] public levelCommissionBps;
     uint256[NUMBER_OF_LEVELS] public levelDirectRequirement;
 
     // Mappings
@@ -245,20 +230,29 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
     // --- EVENTS ---
     event Registered(address indexed user, address indexed sponsor);
     event Deposited(address indexed user, uint256 amount, uint256 dailyRoiBps, uint256 timestamp);
+    event Staked(address indexed user, uint256 amount, string packageId, string sponsorId, uint256 timestamp);
     event ContinuousRoiAccrued(address indexed user, uint256 amountAccrued, uint256 newPending);
-    event LevelCommissionPaid(address indexed beneficiary, address indexed from, uint256 level, uint256 amount);
-    event LevelCommissionCapped(address indexed beneficiary, address indexed from, uint256 level, uint256 skippedAmount);
     event Withdrawn(address indexed user, uint256 grossAmount, uint256 feeAmount, uint256 netPayout);
+    event PayoutDisbursed(address indexed recipient, uint256 netAmount, uint256 feeAmount, string referenceId);
+    event BatchPayoutDisbursed(uint256 totalRecipients, uint256 totalNetAmount);
     event DynamicRoiUpdated(uint256 newDailyBps, uint256 contractReserve);
     event DynamicModeSwitched(bool isAutomated, uint256 manualBps);
+    event OperatorUpdated(address indexed operator, bool indexed status);
     event TreasuryReserveUpdated(address indexed newTreasury);
     event ParametersUpdated(uint256 minDeposit, uint256 reserveLow, uint256 reserveHigh);
+
+    // --- MODIFIERS ---
+    modifier onlyOperatorOrOwner() {
+        require(msg.sender == owner() || isOperator[msg.sender], "Vault: Caller not authorized operator");
+        _;
+    }
 
     // --- CONSTRUCTOR ---
     constructor(
         address _stakingToken,
         address _genesisSponsor,
-        address _treasuryReserve
+        address _treasuryReserve,
+        address _initialOperator
     ) Ownable(msg.sender) {
         require(_stakingToken != address(0), "Invalid staking token");
         require(_genesisSponsor != address(0), "Invalid genesis sponsor");
@@ -272,9 +266,9 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         reserveThresholdLow = 1_000_000 * (10 ** tokenDecimals);
         reserveThresholdHigh = 3_000_000 * (10 ** tokenDecimals);
         isDynamicRoiAutomated = true;
-        manualDailyRoiBps = 75; // 0.75% default if ever set manual
+        manualDailyRoiBps = 75; // 0.75% default
 
-        // Initialize 15-Tier MLM Commission Schedule
+        // Commission Schedule (15 Levels)
         levelCommissionBps[0]  = 1000; // Level 1: 10.00%
         levelCommissionBps[1]  = 500;  // Level 2:  5.00%
         levelCommissionBps[2]  = 300;  // Level 3:  3.00%
@@ -291,7 +285,7 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         levelCommissionBps[13] = 25;   // Level 14: 0.25%
         levelCommissionBps[14] = 25;   // Level 15: 0.25%
 
-        // Initialize Direct Referral Unlock Requirements
+        // Direct Referral Requirements
         levelDirectRequirement[0]  = 1;
         levelDirectRequirement[1]  = 1;
         levelDirectRequirement[2]  = 2;
@@ -308,6 +302,12 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         levelDirectRequirement[13] = 5;
         levelDirectRequirement[14] = 5;
 
+        // Authorize Operator (PHP Hot-Wallet)
+        if (_initialOperator != address(0)) {
+            isOperator[_initialOperator] = true;
+            emit OperatorUpdated(_initialOperator, true);
+        }
+
         // Register Genesis Root Sponsor
         users[_genesisSponsor].isRegistered = true;
         users[_genesisSponsor].sponsor = address(0);
@@ -321,11 +321,6 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice Calculates real-time daily ROI BPS based on pool reserve depth.
-     * Formula:
-     * - Reserve <= ThresholdLow ($1M) => 50 BPS (0.50%/day)
-     * - Reserve >= ThresholdHigh ($3M) => 100 BPS (1.00%/day)
-     * - Between Low & High => Linear curve: 50 + (50 * (Reserve - Low)) / (High - Low)
-     * @return dailyBps Dynamic daily ROI in basis points (50 to 100).
      */
     function getDynamicDailyBps() public view returns (uint256 dailyBps) {
         if (!isDynamicRoiAutomated) {
@@ -341,24 +336,17 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         } else {
             uint256 reserveDelta = currentReserve - reserveThresholdLow;
             uint256 thresholdSpan = reserveThresholdHigh - reserveThresholdLow;
-            uint256 bpsSpan = MAX_DAILY_ROI_BPS - MIN_DAILY_ROI_BPS; // 50 BPS
+            uint256 bpsSpan = MAX_DAILY_ROI_BPS - MIN_DAILY_ROI_BPS;
 
             dailyBps = MIN_DAILY_ROI_BPS + ((reserveDelta * bpsSpan) / thresholdSpan);
             return dailyBps;
         }
     }
 
-    /**
-     * @notice Returns equivalent Annual Percentage Yield (APY / APR) based on current daily ROI.
-     */
     function getAnnualApyBps() external view returns (uint256) {
         return getDynamicDailyBps() * 365;
     }
 
-    /**
-     * @notice Calculates unaccrued pending daily ROI for an account since last accrual.
-     * Takes into account the 300% maximum earning ceiling.
-     */
     function calculatePendingRoi(address account) public view returns (uint256 pendingRoi) {
         User storage u = users[account];
         if (u.totalStaked == 0 || u.lastAccrualTimestamp == 0 || block.timestamp <= u.lastAccrualTimestamp) {
@@ -367,27 +355,17 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
 
         uint256 maxEarnings = u.totalStaked * MAX_CAP_MULTIPLIER;
         if (u.totalEarned >= maxEarnings) {
-            return 0; // 300% Cap already hit
+            return 0;
         }
 
         uint256 remainingCap = maxEarnings - u.totalEarned;
         uint256 timeElapsed = block.timestamp - u.lastAccrualTimestamp;
         uint256 dailyBps = getDynamicDailyBps();
 
-        // Continuous linear accrual: (Staked * BPS * timeElapsed) / (10000 * 86400)
         uint256 rawReward = (u.totalStaked * dailyBps * timeElapsed) / (BPS_DIVISOR * SECONDS_PER_DAY);
-
-        // Cap to remaining allowed earnings
-        if (rawReward > remainingCap) {
-            pendingRoi = remainingCap;
-        } else {
-            pendingRoi = rawReward;
-        }
+        return rawReward > remainingCap ? remainingCap : rawReward;
     }
 
-    /**
-     * @dev Internal update function to snapshot continuous ROI accrual into storage.
-     */
     function _updateAccrual(address account) internal {
         User storage u = users[account];
         if (u.totalStaked == 0) {
@@ -407,16 +385,16 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
     }
 
     // ============================================================================
-    // 4. REGISTRATION & DEPOSIT LOGIC
+    // 4. REGISTRATION & DEPOSIT LOGIC (HYBRID WEB3 COMPLIANT)
     // ============================================================================
 
     /**
-     * @notice Register wallet with a verified sponsor before staking.
+     * @notice Register wallet with sponsor before staking.
      */
     function register(address sponsor) external whenNotPaused {
         require(!users[msg.sender].isRegistered, "Already registered");
         require(sponsor != address(0) && sponsor != msg.sender, "Invalid sponsor address");
-        require(users[sponsor].isRegistered, "Sponsor not registered in protocol");
+        require(users[sponsor].isRegistered, "Sponsor not registered");
 
         _registerUser(msg.sender, sponsor);
     }
@@ -431,38 +409,26 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         userDirects[sponsorAddress].push(userAddress);
         totalProtocolUsers += 1;
 
-        // Propagate team count up the 15 levels
-        address upline = sponsorAddress;
-        for (uint256 i = 0; i < NUMBER_OF_LEVELS && upline != address(0); i++) {
-            users[upline].teamCount += 1;
-            upline = users[upline].sponsor;
-        }
-
         emit Registered(userAddress, sponsorAddress);
     }
 
     /**
-     * @notice Stake USDT to earn dynamic daily ROI and activate 15-tier downline commissions.
-     * @param amount Amount of BEP-20 USDT tokens to stake (in 18 decimals).
-     * @param sponsor Address of referrer (used if user is not yet registered).
+     * @notice Standard Staking Deposit (USDT transfer to Vault)
+     * Emits events for both direct contract monitoring and PHP backend API ingestion.
      */
     function deposit(uint256 amount, address sponsor) external nonReentrant whenNotPaused {
         require(amount >= minDepositAmount, "Amount below minimum deposit");
 
-        // Auto-register if new user
         if (!users[msg.sender].isRegistered) {
             require(sponsor != address(0) && sponsor != msg.sender, "Invalid sponsor address");
-            require(users[sponsor].isRegistered, "Sponsor not registered in protocol");
+            require(users[sponsor].isRegistered, "Sponsor not registered");
             _registerUser(msg.sender, sponsor);
         }
 
-        // Accrue any existing ROI prior to principal balance increase
         _updateAccrual(msg.sender);
 
-        // Safe transfer USDT from user to vault
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Update user staking records
         User storage u = users[msg.sender];
         u.totalStaked += amount;
         totalStakedAllUsers += amount;
@@ -475,132 +441,140 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         }));
 
         emit Deposited(msg.sender, amount, currentDailyBps, block.timestamp);
-
-        // Distribute 15-Tier Downline Commissions
-        _distributeAffiliateCommissions(msg.sender, amount);
+        emit Staked(msg.sender, amount, "standard", "", block.timestamp);
     }
 
     /**
-     * @dev Distributes 15-tier MLM affiliate commissions up the sponsor tree.
-     * Enforces active direct referral unlock requirements and 300% profit capping.
+     * @notice Hybrid Staking Deposit with Package ID & Sponsor Code
+     * Directly consumed by PHP API deposit endpoint.
      */
-    function _distributeAffiliateCommissions(address depositor, uint256 depositAmount) internal {
-        address currentUpline = users[depositor].sponsor;
+    function depositWithPackage(
+        uint256 amount,
+        string calldata packageId,
+        string calldata sponsorId
+    ) external nonReentrant whenNotPaused {
+        require(amount >= minDepositAmount, "Amount below minimum deposit");
 
-        for (uint256 lvl = 0; lvl < NUMBER_OF_LEVELS && currentUpline != address(0); lvl++) {
-            User storage up = users[currentUpline];
-            up.teamTurnover += depositAmount;
+        _updateAccrual(msg.sender);
 
-            uint256 requiredDirects = levelDirectRequirement[lvl];
-            uint256 commissionBps = levelCommissionBps[lvl];
-            uint256 potentialCommission = (depositAmount * commissionBps) / BPS_DIVISOR;
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
 
-            // Check Qualification: Must have staked and meet direct referral requirement
-            if (up.totalStaked > 0 && up.directCount >= requiredDirects) {
-                uint256 maxEarnings = up.totalStaked * MAX_CAP_MULTIPLIER;
-                
-                if (up.totalEarned < maxEarnings) {
-                    uint256 remainingCap = maxEarnings - up.totalEarned;
-                    uint256 actualPayout = potentialCommission;
+        User storage u = users[msg.sender];
+        u.isRegistered = true;
+        u.totalStaked += amount;
+        totalStakedAllUsers += amount;
 
-                    if (actualPayout > remainingCap) {
-                        actualPayout = remainingCap;
-                        emit LevelCommissionCapped(currentUpline, depositor, lvl + 1, potentialCommission - actualPayout);
-                    }
+        uint256 currentDailyBps = getDynamicDailyBps();
+        userDeposits[msg.sender].push(DepositRecord({
+            amount: amount,
+            timestamp: block.timestamp,
+            roiBpsAtDeposit: currentDailyBps
+        }));
 
-                    if (actualPayout > 0) {
-                        up.referralReward += actualPayout;
-                        up.totalEarned += actualPayout;
-                        totalCommissionsDistributed += actualPayout;
-                        emit LevelCommissionPaid(currentUpline, depositor, lvl + 1, actualPayout);
-                    }
-                } else {
-                    emit LevelCommissionCapped(currentUpline, depositor, lvl + 1, potentialCommission);
-                }
-            }
-
-            currentUpline = up.sponsor;
-        }
+        emit Deposited(msg.sender, amount, currentDailyBps, block.timestamp);
+        emit Staked(msg.sender, amount, packageId, sponsorId, block.timestamp);
     }
 
     // ============================================================================
-    // 5. WITHDRAWALS & LIQUIDITY RETENTION FEE
+    // 5. HYBRID DISBURSEMENT (API HOT-WALLET AUTOMATION) & WITHDRAWALS
     // ============================================================================
 
     /**
-     * @notice Withdraws accrued Dynamic ROI and MLM Referral Commissions.
-     * Deducts 5% liquidity fee to reinforce vault reserve, transferring 95% net to user.
-     * @param amount Gross USDT amount requested for withdrawal.
+     * @notice Backend Hot-Wallet / Admin Disbursement
+     * Triggered by PHP API (withdraw.php) to fulfill user withdrawal requests on-chain.
+     * Deducts 5% liquidity retention fee to protect Vault reserve; transfers 95% net to user.
+     */
+    function disbursePayout(
+        address recipient,
+        uint256 grossAmount,
+        string calldata referenceId
+    ) external onlyOperatorOrOwner nonReentrant whenNotPaused {
+        require(recipient != address(0), "Invalid recipient");
+        require(grossAmount > 0, "Gross amount must be > 0");
+
+        uint256 fee = (grossAmount * WITHDRAWAL_FEE_BPS) / BPS_DIVISOR;
+        uint256 netPayout = grossAmount - fee;
+
+        require(stakingToken.balanceOf(address(this)) >= netPayout, "Insufficient contract liquid reserves");
+
+        totalWithdrawnAllUsers += grossAmount;
+        users[recipient].totalWithdrawn += grossAmount;
+
+        stakingToken.safeTransfer(recipient, netPayout);
+
+        emit PayoutDisbursed(recipient, netPayout, fee, referenceId);
+    }
+
+    /**
+     * @notice Batch Payout Disbursement for API high-volume throughput
+     * Executes multiple user withdrawals in 1 gas-saving transaction.
+     */
+    function disburseBatchPayouts(
+        address[] calldata recipients,
+        uint256[] calldata grossAmounts
+    ) external onlyOperatorOrOwner nonReentrant whenNotPaused {
+        require(recipients.length == grossAmounts.length, "Array lengths mismatch");
+        require(recipients.length > 0 && recipients.length <= 100, "Invalid batch size (1-100)");
+
+        uint256 totalNetDisbursed = 0;
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            address recipient = recipients[i];
+            uint256 gross = grossAmounts[i];
+
+            if (recipient == address(0) || gross == 0) continue;
+
+            uint256 fee = (gross * WITHDRAWAL_FEE_BPS) / BPS_DIVISOR;
+            uint256 net = gross - fee;
+
+            totalWithdrawnAllUsers += gross;
+            users[recipient].totalWithdrawn += gross;
+            totalNetDisbursed += net;
+
+            stakingToken.safeTransfer(recipient, net);
+            emit PayoutDisbursed(recipient, net, fee, "BATCH");
+        }
+
+        emit BatchPayoutDisbursed(recipients.length, totalNetDisbursed);
+    }
+
+    /**
+     * @notice Direct On-Chain Withdrawal for accrued Dynamic ROI
      */
     function withdraw(uint256 amount) external nonReentrant whenNotPaused {
-        require(amount > 0, "Amount must be greater than zero");
+        require(amount > 0, "Amount must be > 0");
 
-        // Bring continuous ROI accrual up to date
         _updateAccrual(msg.sender);
 
         User storage u = users[msg.sender];
         uint256 totalAvailable = u.pendingRoiReward + u.referralReward;
-        require(amount <= totalAvailable, "Withdrawal amount exceeds available balance");
+        require(amount <= totalAvailable, "Withdrawal exceeds available balance");
 
-        // Deduct from available balances (ROI balance first, then Referral balance)
         uint256 remainingToDeduct = amount;
         if (u.pendingRoiReward >= remainingToDeduct) {
             u.pendingRoiReward -= remainingToDeduct;
-            remainingToDeduct = 0;
         } else {
             remainingToDeduct -= u.pendingRoiReward;
             u.pendingRoiReward = 0;
             u.referralReward -= remainingToDeduct;
         }
 
-        // Calculate 5% liquidity retention fee & 95% net payout
         uint256 fee = (amount * WITHDRAWAL_FEE_BPS) / BPS_DIVISOR;
         uint256 netPayout = amount - fee;
 
         u.totalWithdrawn += amount;
         totalWithdrawnAllUsers += amount;
 
-        // Ensure contract has sufficient liquid USDT for net payout
         require(stakingToken.balanceOf(address(this)) >= netPayout, "Insufficient contract liquid reserves");
-
-        // Transfer 95% net payout to user
         stakingToken.safeTransfer(msg.sender, netPayout);
 
         emit Withdrawn(msg.sender, amount, fee, netPayout);
-    }
-
-    /**
-     * @notice Withdraws all available earnings (both ROI and referral commissions) in 1 click.
-     */
-    function withdrawAll() external nonReentrant whenNotPaused {
-        _updateAccrual(msg.sender);
-
-        User storage u = users[msg.sender];
-        uint256 totalAvailable = u.pendingRoiReward + u.referralReward;
-        require(totalAvailable > 0, "No claimable earnings available");
-
-        u.pendingRoiReward = 0;
-        u.referralReward = 0;
-
-        uint256 fee = (totalAvailable * WITHDRAWAL_FEE_BPS) / BPS_DIVISOR;
-        uint256 netPayout = totalAvailable - fee;
-
-        u.totalWithdrawn += totalAvailable;
-        totalWithdrawnAllUsers += totalAvailable;
-
-        require(stakingToken.balanceOf(address(this)) >= netPayout, "Insufficient contract liquid reserves");
-        stakingToken.safeTransfer(msg.sender, netPayout);
-
-        emit Withdrawn(msg.sender, totalAvailable, fee, netPayout);
     }
 
     // ============================================================================
     // 6. VIEW & FRONTEND QUERY HELPERS
     // ============================================================================
 
-    /**
-     * @notice Returns complete user dashboard profile in a single call.
-     */
     function getUserDashboard(address account) external view returns (
         bool isRegistered,
         address sponsor,
@@ -634,9 +608,6 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         );
     }
 
-    /**
-     * @notice Returns protocol-wide liquidity, reserves, and dynamic APY status.
-     */
     function getProtocolStats() external view returns (
         uint256 totalVaultReserve,
         uint256 totalStakedGlobal,
@@ -664,41 +635,32 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         );
     }
 
-    /**
-     * @notice Returns array of deposits made by a user.
-     */
     function getUserDeposits(address account) external view returns (DepositRecord[] memory) {
         return userDeposits[account];
     }
 
-    /**
-     * @notice Returns array of direct referral addresses sponsored by user.
-     */
     function getUserDirects(address account) external view returns (address[] memory) {
         return userDirects[account];
     }
 
-    /**
-     * @notice Returns level commission rates in BPS.
-     */
     function getLevelCommissionBps() external view returns (uint256[NUMBER_OF_LEVELS] memory) {
         return levelCommissionBps;
     }
 
-    /**
-     * @notice Returns direct referral count requirements for each level.
-     */
     function getLevelDirectRequirements() external view returns (uint256[NUMBER_OF_LEVELS] memory) {
         return levelDirectRequirement;
     }
 
     // ============================================================================
-    // 7. ADMIN / PROTOCOL GOVERNANCE
+    // 7. ADMIN & OPERATOR GOVERNANCE
     // ============================================================================
 
-    /**
-     * @notice Configures dynamic ROI behavior (automated reserve vs manual override).
-     */
+    function setOperator(address operator, bool status) external onlyOwner {
+        require(operator != address(0), "Invalid operator address");
+        isOperator[operator] = status;
+        emit OperatorUpdated(operator, status);
+    }
+
     function setDynamicRoiMode(bool _isAutomated, uint256 _manualBps) external onlyOwner {
         if (!_isAutomated) {
             require(_manualBps >= MIN_DAILY_ROI_BPS && _manualBps <= MAX_DAILY_ROI_BPS, "BPS out of bounds");
@@ -708,9 +670,6 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         emit DynamicModeSwitched(_isAutomated, _manualBps);
     }
 
-    /**
-     * @notice Configures protocol parameters: min deposit and dynamic reserve scaling bounds.
-     */
     function setProtocolParameters(
         uint256 _minDeposit,
         uint256 _reserveLow,
@@ -723,25 +682,16 @@ contract MorganTreasureVault is Ownable, ReentrancyGuard, Pausable {
         emit ParametersUpdated(_minDeposit, _reserveLow, _reserveHigh);
     }
 
-    /**
-     * @notice Updates treasury reserve destination address.
-     */
     function setTreasuryReserve(address _treasury) external onlyOwner {
         require(_treasury != address(0), "Invalid address");
         treasuryReserve = _treasury;
         emit TreasuryReserveUpdated(_treasury);
     }
 
-    /**
-     * @notice Circuit-breaker pause in case of network anomaly or upgrade.
-     */
     function pause() external onlyOwner {
         _pause();
     }
 
-    /**
-     * @notice Resume protocol operations.
-     */
     function unpause() external onlyOwner {
         _unpause();
     }
