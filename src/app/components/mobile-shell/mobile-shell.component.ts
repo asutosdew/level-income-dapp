@@ -71,8 +71,13 @@ import { DappStateService } from '../../services/dapp-state.service';
               <span>•</span>
               <span>15 Level Matrix</span>
             </div>
-            <div>
-              © 2026 Morgan Treasure Protocol. All rights reserved.
+            <div class="flex items-center gap-2">
+              <span>© 2026 Morgan Treasure Protocol. All rights reserved.</span>
+              <span>•</span>
+              <a routerLink="/admin" class="text-slate-500 hover:text-amber-400 font-bold transition-colors cursor-pointer flex items-center gap-1" title="Executive Management Terminal">
+                <i class="fa-solid fa-lock text-[10px]"></i>
+                <span>Admin</span>
+              </a>
             </div>
           </div>
         </footer>

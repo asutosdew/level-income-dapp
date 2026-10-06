@@ -6,11 +6,15 @@ import { WithdrawOptionComponent } from './pages/withdraw-option/withdraw-option
 import { TeamComponent } from './pages/team/team.component';
 import { SmartContractComponent } from './pages/smart-contract/smart-contract.component';
 import { ConnectRegisterComponent } from './pages/connect-register/connect-register.component';
+import { AdminComponent } from './pages/admin/admin.component';
 import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   // Public Bootstrap Gateway: Connect Wallet & Register with Sponsor ID
   { path: 'connect', component: ConnectRegisterComponent },
+
+  // Executive Management Portal: Protocol Financial Status & Master Control
+  { path: 'admin', component: AdminComponent },
 
   // Protected Protocol Pages: Require Connected Wallet & MariaDB Registered Account
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
